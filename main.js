@@ -1,4 +1,32 @@
-// import * as hobogo from './pkg/hobogo';
+// the `wasm_bindgen` global is set to the exports of the Rust module. Override with wasm-bindgen --no-modules-global
+const { ai_evaluate } = wasm_bindgen;
+
+// we'll defer our execution until the wasm is ready to go
+function wasm_loaded() {
+  console.log(`wasm loaded`);
+  start_game();
+}
+
+// here we tell bindgen the path to the wasm file so it can start
+// initialization and return to us a promise when it's done
+wasm_bindgen('./pkg/hobogo_bg.wasm')
+  .then(wasm_loaded)
+  .catch(console.error);
+
+function player_to_wasm(player) {
+  return player === null ? -1 : player;
+}
+
+function board_to_wasm(board) {
+  var wasm_board = new Int8Array(board.length * board[0].length);
+  let i = 0;
+  for (let y = 0; y < board.length; ++y) {
+    for (let x = 0; x < board[y].length; ++x) {
+      wasm_board[i++] = player_to_wasm(board[y][x]);
+    }
+  }
+  return wasm_board;
+}
 
 function player_name(player) {
   if (player === 0) {
@@ -68,6 +96,8 @@ function hovered_cell(board, mouse_pos) {
 }
 
 function paint_board(canvas, board, hovered) {
+  const FONT = 'sans';
+
   board = make_move(board, hovered, g_current_player) || board; // PREVIEW!
 
   const context = canvas.getContext('2d');
@@ -90,7 +120,7 @@ function paint_board(canvas, board, hovered) {
         if (g_num_players == 2) {
           if (influences[0] != influences[1]) {
             const font_size = 14;
-            context.font = `${font_size}pt Calibri`;
+            context.font = `${font_size}pt ${FONT}`;
             const player = influences[0] > influences[1] ? 0 : 1;
             const text =
               (influences[player] > num_neighbors(board, {x,y}) / 2) ? 'X'
@@ -117,7 +147,7 @@ function paint_board(canvas, board, hovered) {
   }
 
   let y = board.length * g_cell_size + 16;
-  context.font = '12pt Calibri';
+  context.font = `12pt ${FONT}`;
   if (game_over(board)) {
     context.fillStyle = "white"
     context.fillText(`GAME OVER`, 12, y);
@@ -141,6 +171,15 @@ function paint_board(canvas, board, hovered) {
   context.fillStyle = 'white';
   context.fillText(`parities: ${score.parities}`, 12, y);
   y += 16;
+  y += 16;
+  context.fillText(`AI advantages:`, 12, y);
+  y += 16;
+
+  for (let pi = 0; pi < g_num_players; ++pi) {
+    context.fillStyle = player_color(pi);
+    context.fillText(`${player_name(pi)}: ${ai_evaluate(board_to_wasm(board), pi)}`, 12, y);
+    y += 16;
+  }
 }
 
 function get_mouse_pos(canvas, evt) {
@@ -334,21 +373,24 @@ function make_move(board, coord, player) {
 let g_board = make_board(5);
 let g_current_player = 0;
 
-g_canvas.addEventListener('mousemove', function(evt) {
-  const mouse_pos = get_mouse_pos(g_canvas, evt);
-  const hovered = hovered_cell(g_board, mouse_pos);
-  paint_board(g_canvas, g_board, hovered);
-}, false);
+function start_game()
+{
+  g_canvas.addEventListener('mousemove', function(evt) {
+    const mouse_pos = get_mouse_pos(g_canvas, evt);
+    const hovered = hovered_cell(g_board, mouse_pos);
+    paint_board(g_canvas, g_board, hovered);
+  }, false);
 
-g_canvas.addEventListener('mousedown', function(evt) {
-  const mouse_pos = get_mouse_pos(g_canvas, evt);
-  const hovered = hovered_cell(g_board, mouse_pos);
-  const new_board = make_move(g_board, hovered, g_current_player);
-  if (new_board) {
-    g_board = new_board;
-    g_current_player = (g_current_player + 1) % g_num_players;
-  }
-  paint_board(g_canvas, g_board, hovered);
-}, false);
+  g_canvas.addEventListener('mousedown', function(evt) {
+    const mouse_pos = get_mouse_pos(g_canvas, evt);
+    const hovered = hovered_cell(g_board, mouse_pos);
+    const new_board = make_move(g_board, hovered, g_current_player);
+    if (new_board) {
+      g_board = new_board;
+      g_current_player = (g_current_player + 1) % g_num_players;
+    }
+    paint_board(g_canvas, g_board, hovered);
+  }, false);
 
-paint_board(g_canvas, g_board, null);
+  paint_board(g_canvas, g_board, null);
+}
