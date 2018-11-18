@@ -14,77 +14,76 @@ function player_color(player) {
     if (player === null) {
       return "#AAAAAA";
     } else if (player === 0) {
-      return "#DD0000";
+      return "#FF2222";
     } else {
-      return "#5555FF";
+      return "#3366FF";
     }
 }
 
-function cell_color(board, coord, is_hovering)
+function cell_color(board, coord)
 {
   const owner = board_at(board, coord);
   if (owner !== null) {
     return player_color(owner);
   }
 
-  if (is_hovering && is_valid_move(board, coord, g_current_player)) {
-    // TODO: proper preview
-    return player_color(g_current_player);
-  }
+  // if (is_hovering && is_valid_move(board, coord, g_current_player)) {
+  //   // TODO: proper preview
+  //   return player_color(g_current_player);
+  // }
 
   if (is_valid_move(board, coord, g_current_player)) {
-    return "#AAAAAA";
+    return "#777";
   }
 
   const ruler = ruled_by(board, coord);
   if (ruler === null) {
     // We may not currently play here, but we might in the future!
-    return "#666666";
+    return "#444";
   } else {
     // We will never be able to play here:
-    return "#444444";
+    return "#222";
   }
 }
 
-function paint_board(canvas, board, mouse_pos) {
-  const message = 'Mouse position: ' + mouse_pos.x + ',' + mouse_pos.y;
+const g_cell_size = 48;
+
+function hovered_cell(board, mouse_pos) {
+  for (let y = 0; y < board.length; ++y) {
+    for (let x = 0; x < board[y].length; ++x) {
+      const pad = 2;
+      const left = x * g_cell_size + pad;
+      const top = y * g_cell_size + pad;
+      const right = (x + 1) * g_cell_size - pad;
+      const bottom = (y + 1) * g_cell_size - pad;
+      const is_hovering =
+        left <= mouse_pos.x && mouse_pos.x <= right &&
+        top <= mouse_pos.y && mouse_pos.y <= bottom;
+      if (is_hovering) {
+        return {x, y};
+      }
+    }
+  }
+  return null;
+}
+
+function paint_board(canvas, board, hovered) {
+  board = make_move(board, hovered, g_current_player) || board; // PREVIEW!
 
   const context = canvas.getContext('2d');
   context.fillStyle = "#111111";
   context.clearRect(0, 0, canvas.width, canvas.height);
 
-  const cell_size = 48;
-
-  let hovered = null;
-
   for (let y = 0; y < board.length; ++y) {
     for (let x = 0; x < board[y].length; ++x) {
       const pad = 2;
-      const left = x * cell_size + pad;
-      const top = y * cell_size + pad;
-      const right = (x + 1) * cell_size - pad;
-      const bottom = (y + 1) * cell_size - pad;
-      const is_hovering =
-        left <= mouse_pos.x && mouse_pos.x <= right &&
-        top <= mouse_pos.y && mouse_pos.y <= bottom;
-      if (is_hovering) {
-        hovered = {x, y};
-      }
+      const left = x * g_cell_size + pad;
+      const top = y * g_cell_size + pad;
+      const right = (x + 1) * g_cell_size - pad;
+      const bottom = (y + 1) * g_cell_size - pad;
 
-      context.fillStyle = player_color(board[y][x]);
+      context.fillStyle = cell_color(board, {x,y});
       context.fillRect(left, top, right - left, bottom - top);
-
-      context.fillStyle = cell_color(board, {x,y}, is_hovering);
-      context.fillRect(left, top, right - left, bottom - top);
-
-      // if (is_valid_move(board, {x,y}, g_current_player)) {
-      //   const lw = 4;
-      //   context.beginPath();
-      //   context.rect(left - lw / 2, top - lw / 2, right - left + lw, bottom - top + lw);
-      //   context.lineWidth = lw;
-      //   context.strokeStyle = player_color(g_current_player);
-      //   context.stroke();
-      // }
 
       if (board[y][x] === null) {
         const influences = influences_at(board, {x, y});
@@ -102,8 +101,8 @@ function paint_board(canvas, board, mouse_pos) {
         } else {
           for (let pi = 0; pi < g_num_players; ++pi) {
             for (let i = 0; i < influences[pi]; ++i) {
-              const cx = left + cell_size * (1 + i) / 5;
-              const cy = top + cell_size * (1 + pi) / (g_num_players + 1);
+              const cx = left + g_cell_size * (1 + i) / 5;
+              const cy = top + g_cell_size * (1 + pi) / (g_num_players + 1);
 
               var radius = 4;
               context.beginPath();
@@ -117,11 +116,15 @@ function paint_board(canvas, board, mouse_pos) {
     }
   }
 
-  let y = board.length * cell_size + 16;
+  let y = board.length * g_cell_size + 16;
   context.font = '12pt Calibri';
-  context.fillStyle = player_color(g_current_player);
-  // context.fillText(`5 + 3 = ${emil_add(5, 4)}`, 10, 25);
-  context.fillText(`Current player: ${player_name(g_current_player)}`, 12, y);
+  if (game_over(board)) {
+    context.fillStyle = "white"
+    context.fillText(`GAME OVER`, 12, y);
+  } else {
+    context.fillStyle = player_color(g_current_player);
+    context.fillText(`Current player: ${player_name(g_current_player)}`, 12, y);
+  }
   y += 16;
   y += 16;
 
@@ -129,17 +132,15 @@ function paint_board(canvas, board, mouse_pos) {
   context.fillText(`Score:`, 12, y);
   y += 16;
 
-  const s = score(board);
+  const score = get_score(board);
   for (let pi = 0; pi < g_num_players; ++pi) {
     context.fillStyle = player_color(pi);
-    context.fillText(`${player_name(pi)}: ${s.certain[pi]}`, 12, y);
+    context.fillText(`${player_name(pi)}: ${score.certain[pi]} (+ ${score.claimed[pi]} claimed)`, 12, y);
     y += 16;
   }
   context.fillStyle = 'white';
-  context.fillText(`Uncertain: ${s.uncertain}`, 12, y);
+  context.fillText(`parities: ${score.parities}`, 12, y);
   y += 16;
-
-  return hovered;
 }
 
 function get_mouse_pos(canvas, evt) {
@@ -161,7 +162,7 @@ function array(n, value_maker) {
   return board;
 }
 
-function new_board(n) {
+function make_board(n) {
   return array(n, (_) => array(n, (_) => null));
 }
 
@@ -204,6 +205,7 @@ function influences_at(board, coord) {
   return influences;
 }
 
+// This piece of land can never be taken by anyone but...
 function ruled_by(board, coord) {
   if (board[coord.y][coord.x] !== null) {
     return board[coord.y][coord.x];
@@ -220,19 +222,47 @@ function ruled_by(board, coord) {
   return null;
 }
 
-function score(board) {
+// This piece of ground is by majority influenced by...
+function claimed_by(board, coord) {
+  if (board[coord.y][coord.x] !== null) {
+    return board[coord.y][coord.x];
+  }
+
+  const influences = influences_at(board, coord);
+  for (let player = 0; player < g_num_players; ++player) {
+    let somebody_else_is_as_large = false;
+    for (let other = 0; other < g_num_players; ++other) {
+      if (player != other && influences[other] >= influences[player]) {
+        somebody_else_is_as_large = true;
+      }
+    }
+    if (!somebody_else_is_as_large) {
+      return player;
+    }
+  }
+
+  return null;
+}
+
+function get_score(board) {
   let score = {
     certain: array(g_num_players, (_) => 0),
-    uncertain: 0,
+    claimed: array(g_num_players, (_) => 0),
+    parities: 0,
   };
 
   for (let y = 0; y < board.length; ++y) {
     for (let x = 0; x < board[y].length; ++x) {
-      const player = ruled_by(board, {x,y});
-      if (player === null) {
-        score.uncertain += 1;
+      const ruler = ruled_by(board, {x,y});
+      if (ruler !== null) {
+        score.certain[ruler] += 1;
       } else {
-        score.certain[player] += 1;
+        const claimer = claimed_by(board, {x,y});
+        if (claimer !== null) {
+          score.claimed[claimer] += 1;
+        } else {
+          score.parities += 1;
+        }
       }
     }
   }
@@ -240,7 +270,34 @@ function score(board) {
   return score;
 }
 
+function is_everything_ruled_by_someone(board) {
+  for (let y = 0; y < board.length; ++y) {
+    for (let x = 0; x < board[y].length; ++x) {
+      if (ruled_by(board, {x, y}) === null) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
+function game_over(board) {
+  // TODO: how to know for sure?
+  return is_everything_ruled_by_someone(board); // Very rough heuristic
+}
+
+function fill_in(old_board) {
+  let new_board = make_board(old_board.length);
+  for (let y = 0; y < old_board.length; ++y) {
+    for (let x = 0; x < old_board[y].length; ++x) {
+      new_board[y][x] = claimed_by(old_board, {x, y});
+    }
+  }
+  return new_board;
+}
+
 function is_valid_move(board, coord, player) {
+  if (coord == null) { return false; }
   if (coord.x < 0 || board[0].length <= coord.x) { return false; }
   if (coord.y < 0 || board.length <= coord.y) { return false; }
   if (board[coord.y][coord.x] !== null) { return false; }
@@ -254,22 +311,44 @@ function is_valid_move(board, coord, player) {
   return true;
 }
 
-let g_board = new_board(7);
+function clone(obj)
+{
+  return JSON.parse(JSON.stringify(obj));
+}
+
+function make_move(board, coord, player) {
+  if (!is_valid_move(board, coord, player)) {
+    return null;
+  }
+
+  board = clone(board);
+  board[coord.y][coord.x] = player;
+
+  if (game_over(board)) {
+    board = fill_in(board);
+  }
+
+  return board
+}
+
+let g_board = make_board(5);
 let g_current_player = 0;
 
 g_canvas.addEventListener('mousemove', function(evt) {
   const mouse_pos = get_mouse_pos(g_canvas, evt);
-  paint_board(g_canvas, g_board, mouse_pos);
+  const hovered = hovered_cell(g_board, mouse_pos);
+  paint_board(g_canvas, g_board, hovered);
 }, false);
 
 g_canvas.addEventListener('mousedown', function(evt) {
   const mouse_pos = get_mouse_pos(g_canvas, evt);
-  const hovered = paint_board(g_canvas, g_board, mouse_pos);
-  if (hovered !== null && is_valid_move(g_board, hovered, g_current_player)) {
-    g_board[hovered.y][hovered.x] = g_current_player;
+  const hovered = hovered_cell(g_board, mouse_pos);
+  const new_board = make_move(g_board, hovered, g_current_player);
+  if (new_board) {
+    g_board = new_board;
     g_current_player = (g_current_player + 1) % g_num_players;
   }
-  paint_board(g_canvas, g_board, mouse_pos);
+  paint_board(g_canvas, g_board, hovered);
 }, false);
 
-paint_board(g_canvas, g_board, {x: 0, y: 0});
+paint_board(g_canvas, g_board, null);
