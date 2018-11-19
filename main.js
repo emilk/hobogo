@@ -95,6 +95,8 @@ function hovered_cell(board, mouse_pos) {
   return null;
 }
 
+const PAINT_INFLUENCE = true;
+
 function paint_board(canvas, board, hovered) {
   const FONT = 'monospace';
 
@@ -115,11 +117,11 @@ function paint_board(canvas, board, hovered) {
       context.fillStyle = cell_color(board, {x,y});
       context.fillRect(left, top, right - left, bottom - top);
 
-      if (board[y][x] === null) {
+      if (board[y][x] === null && PAINT_INFLUENCE) {
         const influences = influences_at(board, {x, y});
         if (g_num_players == 2) {
           if (influences[0] != influences[1]) {
-            const font_size = 14;
+            const font_size = 10;
             context.font = `${font_size}pt ${FONT}`;
             const player = influences[0] > influences[1] ? 0 : 1;
             const text =
@@ -324,6 +326,8 @@ function is_everything_ruled_by_someone(board) {
 function game_over(board) {
   // TODO: how to know for sure?
   return is_everything_ruled_by_someone(board); // Very rough heuristic
+
+  // TODO: check if only one player has a move
 }
 
 function fill_in(old_board) {
@@ -371,7 +375,7 @@ function make_move(board, coord, player) {
   return board
 }
 
-let g_board = make_board(5);
+let g_board = make_board(7);
 let g_current_player = 0;
 
 function start_game()
@@ -386,6 +390,9 @@ function start_game()
     const mouse_pos = get_mouse_pos(g_canvas, evt);
     const hovered = hovered_cell(g_board, mouse_pos);
     try_make_move(hovered);
+    if (g_current_player == 1) {
+      make_ai_move();
+    }
     paint_board(g_canvas, g_board, hovered);
   }, false);
 

@@ -164,7 +164,7 @@ impl Board {
                         points[player as usize] += 10;
                     }
                     Influence::Ruled(player) => {
-                        points[player as usize] += 10;
+                        points[player as usize] += 3;
                     }
                     Influence::Claimed(player) => {
                         points[player as usize] += 1;
