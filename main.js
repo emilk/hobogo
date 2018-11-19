@@ -1,5 +1,5 @@
 // the `wasm_bindgen` global is set to the exports of the Rust module. Override with wasm-bindgen --no-modules-global
-const { ai_evaluate } = wasm_bindgen;
+const { ai_evaluate, ai_move, JsCoord } = wasm_bindgen;
 
 // we'll defer our execution until the wasm is ready to go
 function wasm_loaded() {
@@ -30,7 +30,7 @@ function board_to_wasm(board) {
 
 function player_name(player) {
   if (player === 0) {
-    return "red";
+    return "red ";
   } else if (player == 1) {
     return "blue";
   } else {
@@ -96,7 +96,7 @@ function hovered_cell(board, mouse_pos) {
 }
 
 function paint_board(canvas, board, hovered) {
-  const FONT = 'sans';
+  const FONT = 'monospace';
 
   board = make_move(board, hovered, g_current_player) || board; // PREVIEW!
 
@@ -176,8 +176,9 @@ function paint_board(canvas, board, hovered) {
   y += 16;
 
   for (let pi = 0; pi < g_num_players; ++pi) {
+    const advantage = ai_evaluate(board_to_wasm(board), pi);
     context.fillStyle = player_color(pi);
-    context.fillText(`${player_name(pi)}: ${ai_evaluate(board_to_wasm(board), pi)}`, 12, y);
+    context.fillText(`${player_name(pi)}: ${advantage.toFixed(3)}`, 12, y);
     y += 16;
   }
 }
@@ -384,13 +385,27 @@ function start_game()
   g_canvas.addEventListener('mousedown', function(evt) {
     const mouse_pos = get_mouse_pos(g_canvas, evt);
     const hovered = hovered_cell(g_board, mouse_pos);
-    const new_board = make_move(g_board, hovered, g_current_player);
-    if (new_board) {
-      g_board = new_board;
-      g_current_player = (g_current_player + 1) % g_num_players;
-    }
+    try_make_move(hovered);
     paint_board(g_canvas, g_board, hovered);
   }, false);
 
   paint_board(g_canvas, g_board, null);
 }
+
+function try_make_move(coord)
+{
+    const new_board = make_move(g_board, coord, g_current_player);
+    if (new_board) {
+      g_board = new_board;
+      g_current_player = (g_current_player + 1) % g_num_players;
+    }
+}
+
+export function make_ai_move()
+{
+  const coord = ai_move(board_to_wasm(g_board), player_to_wasm(g_current_player));
+  try_make_move(coord);
+  paint_board(g_canvas, g_board, null);
+}
+
+window.make_ai_move = make_ai_move; // HACK
