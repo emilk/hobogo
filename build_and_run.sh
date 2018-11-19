@@ -11,3 +11,4 @@ wasm-bindgen target/wasm32-unknown-unknown/debug/hobogo.wasm \
   --out-dir pkg --no-modules
   # --no-modules-global hoboho
 
+open "index.html"
