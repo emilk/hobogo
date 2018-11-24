@@ -1,4 +1,3 @@
 **.wasm
 *.sublime*
-/pkg/hobogo.js
 /target

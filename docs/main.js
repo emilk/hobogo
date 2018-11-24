@@ -9,7 +9,7 @@ function wasm_loaded() {
 
 // here we tell bindgen the path to the wasm file so it can start
 // initialization and return to us a promise when it's done
-wasm_bindgen('./pkg/hobogo_bg.wasm')
+wasm_bindgen('./hobogo_bg.wasm')
   .then(wasm_loaded)
   .catch(console.error);
 

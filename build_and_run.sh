@@ -3,4 +3,4 @@ set -eu
 
 ./build.sh
 
-open "index.html"
+open "docs/index.html"

@@ -11,8 +11,6 @@ fi
 cargo build --target wasm32-unknown-unknown
 
 # Generate JS bindings for wasm:
-rm -rf pkg
-mkdir -p pkg
 wasm-bindgen target/wasm32-unknown-unknown/debug/hobogo.wasm \
-  --out-dir pkg --no-modules
+  --out-dir docs --no-modules
   # --no-modules-global hoboho
