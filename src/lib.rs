@@ -1,10 +1,12 @@
+extern crate rand;
 extern crate wasm_bindgen;
+extern crate web_sys;
 
 use wasm_bindgen::prelude::*;
 
-mod ai;
+mod hobogo;
 
-use self::ai::{Board, Coord, Player};
+use self::hobogo::{Board, Coord, Player};
 
 #[wasm_bindgen]
 extern "C" {
