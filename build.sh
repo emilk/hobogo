@@ -10,6 +10,9 @@ fi
 # Build rust:
 cargo build --target wasm32-unknown-unknown
 
+# Compile typescript:
+tsc
+
 # Generate JS bindings for wasm:
 wasm-bindgen target/wasm32-unknown-unknown/debug/hobogo.wasm \
   --out-dir docs --no-modules
