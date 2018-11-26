@@ -1,6 +1,5 @@
 // the `wasm_bindgen` global is set to the exports of the Rust module. Override with wasm-bindgen --no-modules-global
 declare var wasm_bindgen: any;
-const { ai_evaluate, ai_move, JsCoord } = wasm_bindgen;
 
 // we'll defer our execution until the wasm is ready to go
 function wasm_loaded() {
@@ -28,6 +27,20 @@ function board_to_wasm(board) {
   }
   return wasm_board;
 }
+
+function ai_evaluate(board, player) {
+  return wasm_bindgen.ai_evaluate(board_to_wasm(board), player_to_wasm(player))
+}
+
+function ai_move(board, player) {
+  return wasm_bindgen.ai_move(board_to_wasm(board), player_to_wasm(player))
+}
+
+function game_over(board) {
+  return wasm_bindgen.game_over(board_to_wasm(board))
+}
+
+// ----------------------------------------------------------------------------
 
 function player_name(player) {
   if (player === 0) {
@@ -179,7 +192,7 @@ function paint_board(canvas, board, hovered) {
   y += 16;
 
   for (let pi = 0; pi < g_num_players; ++pi) {
-    const advantage = ai_evaluate(board_to_wasm(board), pi);
+    const advantage = ai_evaluate(board, pi);
     context.fillStyle = player_color(pi);
     context.fillText(`${player_name(pi)}: ${advantage.toFixed(3)}`, 12, y);
     y += 16;
@@ -313,24 +326,6 @@ function get_score(board) {
   return score;
 }
 
-function is_everything_ruled_by_someone(board) {
-  for (let y = 0; y < board.length; ++y) {
-    for (let x = 0; x < board[y].length; ++x) {
-      if (ruled_by(board, {x, y}) === null) {
-        return false;
-      }
-    }
-  }
-  return true;
-}
-
-function game_over(board) {
-  // TODO: how to know for sure?
-  return is_everything_ruled_by_someone(board); // Very rough heuristic
-
-  // TODO: check if only one player has a move
-}
-
 function fill_in(old_board) {
   let new_board = make_board(old_board.length);
   for (let y = 0; y < old_board.length; ++y) {
@@ -411,7 +406,7 @@ function try_make_move(coord)
 
 export function make_ai_move()
 {
-  const coord = ai_move(board_to_wasm(g_board), player_to_wasm(g_current_player));
+  const coord = ai_move(g_board, g_current_player);
   try_make_move(coord);
   paint_board(g_canvas, g_board, null);
 }

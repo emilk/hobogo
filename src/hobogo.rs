@@ -1,4 +1,4 @@
-use web_sys::console;
+// use web_sys::console;
 
 const MAX_PLAYERS: usize = 8;
 
@@ -30,6 +30,17 @@ enum Influence {
     Tied,
 }
 
+impl Influence {
+    fn player(&self) -> Option<Player> {
+        match self {
+            Influence::Occupied(player) => Some(*player),
+            Influence::Ruled(player) => Some(*player),
+            Influence::Claimed(player) => Some(*player),
+            Influence::Tied => None,
+        }
+    }
+}
+
 #[derive(Copy, Clone, Debug)]
 pub struct Coord {
     pub x: i32,
@@ -44,11 +55,11 @@ pub struct Board {
 }
 
 impl Board {
-    fn contains(&self, c: Coord) -> bool {
+    pub fn contains(&self, c: Coord) -> bool {
         0 <= c.x && c.x < self.width && 0 <= c.y && c.y < self.height
     }
 
-    fn index(&self, c: Coord) -> Option<usize> {
+    pub fn index(&self, c: Coord) -> Option<usize> {
         if self.contains(c) {
             Some((self.width * c.y + c.x) as usize)
         } else {
@@ -56,12 +67,17 @@ impl Board {
         }
     }
 
-    fn at(&self, c: Coord) -> Cell {
+    pub fn at(&self, c: Coord) -> Cell {
         self.index(c).and_then(|index| self.cells[index])
     }
 
+    pub fn set(&mut self, c: Coord, player: Player) {
+        let index = self.index(c).unwrap();
+        self.cells[index] = Some(player);
+    }
+
     /// Returns None on invalid move
-    fn try_make_move(&self, c: Coord, player: Player) -> Option<Board> {
+    pub fn try_make_move(&self, c: Coord, player: Player) -> Option<Board> {
         if let Some(index) = self.index(c) {
             if self.is_valid_move(c, player) {
                 let mut after = self.clone(); // TODO: faster
@@ -72,13 +88,13 @@ impl Board {
         None
     }
 
-    fn coords(&self) -> impl Iterator<Item = Coord> {
+    pub fn coords(&self) -> impl Iterator<Item = Coord> {
         let width = self.width;
         let height = self.height;
         (0..height).flat_map(move |y| (0..width).map(move |x| Coord { x, y }))
     }
 
-    fn is_valid_move(&self, c: Coord, who_wants_to_move: Player) -> bool {
+    pub fn is_valid_move(&self, c: Coord, who_wants_to_move: Player) -> bool {
         match self.influence(c) {
             Influence::Occupied(_) => false,
             Influence::Ruled(ruler) => ruler == who_wants_to_move,
@@ -141,6 +157,73 @@ impl Board {
             }
         }
         return Influence::Tied;
+    }
+
+    pub fn everything_is_ruled_by_someone(&self) -> bool {
+        self.coords()
+            .map(|c| self.influence(c))
+            .all(|influence| match influence {
+                Influence::Occupied(player) => return true,
+                Influence::Ruled(player) => return true,
+                Influence::Claimed(player) => return false,
+                Influence::Tied => return false,
+            })
+    }
+
+    pub fn one_player_has_more_than_half(&self) -> bool {
+        let mut points = [0; MAX_PLAYERS];
+        for influence in self.coords().map(|c| self.influence(c)) {
+            match influence {
+                Influence::Occupied(player) => points[player as usize] += 1,
+                Influence::Ruled(player) => points[player as usize] += 1,
+                Influence::Claimed(player) => (),
+                Influence::Tied => (),
+            }
+        }
+        points
+            .iter()
+            .any(|&point| point > self.width * self.height / 2)
+    }
+
+    pub fn game_over(&self) -> bool {
+        // TODO: check if only one player has a move
+        self.everything_is_ruled_by_someone() || self.one_player_has_more_than_half()
+    }
+
+    pub fn leaders(&self) -> Vec<Player> {
+        let mut points = [0; MAX_PLAYERS];
+        for influence in self.coords().map(|c| self.influence(c)) {
+            if let Some(player) = influence.player() {
+                points[player as usize] += 1usize;
+            }
+        }
+
+        let leader_score: usize = *points.iter().max().unwrap();
+        if leader_score == 0 {
+            vec![]
+        } else {
+            (0..MAX_PLAYERS)
+                .filter(|&player| points[player] == leader_score)
+                .map(|player| player as Player)
+                .collect()
+        }
+    }
+
+    pub fn leader(&self) -> Option<Player> {
+        let leaders = self.leaders();
+        if leaders.len() == 1 {
+            Some(leaders[0])
+        } else {
+            None
+        }
+    }
+
+    pub fn winner(&self) -> Option<Player> {
+        if self.game_over() {
+            self.leader()
+        } else {
+            None
+        }
     }
 }
 

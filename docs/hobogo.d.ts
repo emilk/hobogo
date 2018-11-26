@@ -1,4 +1,6 @@
 /* tslint:disable */
+export function game_over(arg0: Int8Array): boolean;
+
 export function ai_evaluate(arg0: Int8Array, arg1: number): number;
 
 export function ai_move(arg0: Int8Array, arg1: number): JsCoord;

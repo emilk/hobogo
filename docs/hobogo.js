@@ -18,6 +18,22 @@
     }
     /**
     * @param {Int8Array} arg0
+    * @returns {boolean}
+    */
+    __exports.game_over = function(arg0) {
+        const [ptr0, len0] = passArray8ToWasm(arg0);
+        try {
+            return (wasm.game_over(ptr0, len0)) !== 0;
+
+        } finally {
+            wasm.__wbindgen_free(ptr0, len0 * 1);
+
+        }
+
+    };
+
+    /**
+    * @param {Int8Array} arg0
     * @param {number} arg1
     * @returns {number}
     */

@@ -19,6 +19,11 @@ pub struct JsCoord {
     pub y: i32,
 }
 
+#[wasm_bindgen]
+pub fn game_over(board: &[i8]) -> bool {
+    Board::from_js(board).game_over()
+}
+
 // How likely is the given player to win?
 #[wasm_bindgen]
 pub fn ai_evaluate(board: &[i8], player: u8) -> f64 {
