@@ -1,4 +1,10 @@
-// use web_sys::console;
+use std::fmt;
+
+use web_sys;
+
+fn console_log(s: String) {
+    web_sys::console::log_1(&s.into());
+}
 
 const MAX_PLAYERS: usize = 8;
 
@@ -47,6 +53,12 @@ pub struct Coord {
     pub y: i32,
 }
 
+impl fmt::Display for Coord {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{{{}, {}}}", self.x, self.y)
+    }
+}
+
 #[derive(Clone)]
 pub struct Board {
     cells: Vec<Cell>,
@@ -74,18 +86,6 @@ impl Board {
     pub fn set(&mut self, c: Coord, player: Player) {
         let index = self.index(c).unwrap();
         self.cells[index] = Some(player);
-    }
-
-    /// Returns None on invalid move
-    pub fn try_make_move(&self, c: Coord, player: Player) -> Option<Board> {
-        if let Some(index) = self.index(c) {
-            if self.is_valid_move(c, player) {
-                let mut after = self.clone(); // TODO: faster
-                after.cells[index] = Some(player);
-                return Some(after);
-            }
-        }
-        None
     }
 
     pub fn coords(&self) -> impl Iterator<Item = Coord> {
@@ -163,9 +163,9 @@ impl Board {
         self.coords()
             .map(|c| self.influence(c))
             .all(|influence| match influence {
-                Influence::Occupied(player) => return true,
-                Influence::Ruled(player) => return true,
-                Influence::Claimed(player) => return false,
+                Influence::Occupied(_) => return true,
+                Influence::Ruled(_) => return true,
+                Influence::Claimed(_) => return false,
                 Influence::Tied => return false,
             })
     }
@@ -176,7 +176,7 @@ impl Board {
             match influence {
                 Influence::Occupied(player) => points[player as usize] += 1,
                 Influence::Ruled(player) => points[player as usize] += 1,
-                Influence::Claimed(player) => (),
+                Influence::Claimed(_) => (),
                 Influence::Tied => (),
             }
         }
@@ -238,57 +238,41 @@ impl Board {
         }
     }
 
-    // How good is the position for the current player?
-    pub fn evaluate(&self, player: Player) -> f64 {
-        let mut points: [usize; MAX_PLAYERS] = [0; MAX_PLAYERS];
-        let mut num_tied = 1;
-
-        for c in self.coords() {
-            match self.influence(c) {
-                Influence::Occupied(player) => {
-                    points[player as usize] += 10;
-                }
-                Influence::Ruled(player) => {
-                    points[player as usize] += 3;
-                }
-                Influence::Claimed(player) => {
-                    points[player as usize] += 1;
-                }
-                Influence::Tied => {
-                    // TODO: count range?
-                    num_tied += 1;
-                }
-            }
-        }
-
-        (points[player as usize] as f64) / ((points.iter().sum::<usize>() + num_tied) as f64)
-    }
-
     pub fn ai_move(&self, player: Player) -> Option<Coord> {
-        use rand::prelude::*;
-        let mut rng = rand::rngs::OsRng::new().unwrap();
-
-        let mut best_score = std::f64::NEG_INFINITY;
-        let mut best_move = None;
-        let mut num_best: f32 = 0.0;
-        for c in self.coords() {
-            // console::log_1(&format!("Evaluating {:?}...", c).into());
-            if let Some(after) = self.try_make_move(c, player) {
-                let score = after.evaluate(player);
-                if score > best_score {
-                    best_score = score;
-                    best_move = Some(c);
-                    num_best = 1.0;
-                } else if score == best_score {
-                    // Reservoir sampling:
-                    num_best += 1.0;
-                    if rng.gen::<f32>() < 1.0 / num_best {
-                        best_score = score;
-                        best_move = Some(c);
-                    }
-                }
-            }
+        fn now_sec() -> f64 {
+            web_sys::window()
+                .expect("should have a Window")
+                .performance()
+                .expect("should have a Performance")
+                .now()
+                / 1000.0
         }
-        best_move
+
+        use mcts;
+        use rand::SeedableRng;
+        let mut rng = rand::rngs::OsRng::new().unwrap();
+        let mut rng = rand::rngs::SmallRng::from_rng(&mut rng).unwrap(); // Fast
+
+        let state = mcts::GameState {
+            ai_player: player,
+            next_player: player,
+            num_players: 2, // TODO
+            board: self.clone(),
+        };
+
+        let think_time = 1.0;
+        let mut mcts = mcts::Mcts::new(state);
+        let start = now_sec();
+        while {
+            mcts.iterate(&mut rng);
+            now_sec() - start < think_time
+        } {}
+
+        console_log(format!(
+            "{:.1} iterations per second",
+            mcts.num_iterations() as f64 / (now_sec() - start)
+        ));
+        console_log(format!("{}", mcts));
+        mcts.best_action().cloned()
     }
 }

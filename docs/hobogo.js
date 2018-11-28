@@ -35,23 +35,6 @@
     /**
     * @param {Int8Array} arg0
     * @param {number} arg1
-    * @returns {number}
-    */
-    __exports.ai_evaluate = function(arg0, arg1) {
-        const [ptr0, len0] = passArray8ToWasm(arg0);
-        try {
-            return wasm.ai_evaluate(ptr0, len0, arg1);
-
-        } finally {
-            wasm.__wbindgen_free(ptr0, len0 * 1);
-
-        }
-
-    };
-
-    /**
-    * @param {Int8Array} arg0
-    * @param {number} arg1
     * @returns {JsCoord}
     */
     __exports.ai_move = function(arg0, arg1) {
@@ -66,13 +49,38 @@
 
     };
 
-    let cachedTextDecoder = new TextDecoder('utf-8');
+    const __widl_f_log_1__target = console.log;
 
-    function getStringFromWasm(ptr, len) {
-        return cachedTextDecoder.decode(getUint8Memory().subarray(ptr, ptr + len));
-    }
+    const stack = [];
 
     const slab = [{ obj: undefined }, { obj: null }, { obj: true }, { obj: false }];
+
+    function getObject(idx) {
+        if ((idx & 1) === 1) {
+            return stack[idx >> 1];
+        } else {
+            const val = slab[idx >> 1];
+
+            return val.obj;
+
+        }
+    }
+
+    __exports.__widl_f_log_1_ = function(arg0) {
+        __widl_f_log_1__target(getObject(arg0));
+    };
+
+    const __widl_f_now_Performance_target = typeof Performance === 'undefined' ? null : Performance.prototype.now || function() {
+        throw new Error(`wasm-bindgen: Performance.now does not exist`);
+    };
+
+    __exports.__widl_f_now_Performance = function(arg0) {
+        return __widl_f_now_Performance_target.call(getObject(arg0));
+    };
+
+    __exports.__widl_instanceof_Window = function(idx) {
+        return getObject(idx) instanceof Window ? 1 : 0;
+    };
 
     let slab_next = slab.length;
 
@@ -87,23 +95,51 @@
         return idx << 1;
     }
 
-    __exports.__wbg_new_baf10398b0d0c64d = function(arg0, arg1) {
+    function isLikeNone(x) {
+        return x === undefined || x === null;
+    }
+
+    __exports.__widl_f_performance_Window = function(arg0) {
+
+        const val = getObject(arg0).performance;
+        return isLikeNone(val) ? 0 : addHeapObject(val);
+
+    };
+
+    let cachedTextDecoder = new TextDecoder('utf-8');
+
+    function getStringFromWasm(ptr, len) {
+        return cachedTextDecoder.decode(getUint8Memory().subarray(ptr, ptr + len));
+    }
+
+    __exports.__wbg_newnoargs_96cbdf0d056b2fa8 = function(arg0, arg1) {
         let varg0 = getStringFromWasm(arg0, arg1);
         return addHeapObject(new Function(varg0));
     };
 
-    const stack = [];
+    let cachegetUint32Memory = null;
+    function getUint32Memory() {
+        if (cachegetUint32Memory === null || cachegetUint32Memory.buffer !== wasm.memory.buffer) {
+            cachegetUint32Memory = new Uint32Array(wasm.memory.buffer);
+        }
+        return cachegetUint32Memory;
+    }
 
-    function getObject(idx) {
-        if ((idx & 1) === 1) {
-            return stack[idx >> 1];
-        } else {
-            const val = slab[idx >> 1];
-
-            return val.obj;
+    __exports.__wbg_call_ee8306f6b79399de = function(arg0, arg1, exnptr) {
+        try {
+            return addHeapObject(getObject(arg0).call(getObject(arg1)));
+        } catch (e) {
+            const view = getUint32Memory();
+            view[exnptr / 4] = 1;
+            view[exnptr / 4 + 1] = addHeapObject(e);
 
         }
-    }
+    };
+
+    __exports.__wbg_new_baf10398b0d0c64d = function(arg0, arg1) {
+        let varg0 = getStringFromWasm(arg0, arg1);
+        return addHeapObject(new Function(varg0));
+    };
 
     __exports.__wbg_call_173f04c850a68d5f = function(arg0, arg1) {
         return addHeapObject(getObject(arg0).call(getObject(arg1)));
@@ -182,6 +218,17 @@
     }
     __exports.JsCoord = JsCoord;
 
+    __exports.__wbindgen_object_clone_ref = function(idx) {
+        // If this object is on the stack promote it to the heap.
+        if ((idx & 1) === 1) return addHeapObject(getObject(idx));
+
+        // Otherwise if the object is on the heap just bump the
+        // refcount and move on
+        const val = slab[idx >> 1];
+        val.cnt += 1;
+        return idx;
+    };
+
     function dropRef(idx) {
 
         idx = idx >> 1;
@@ -198,6 +245,10 @@
 
     __exports.__wbindgen_object_drop_ref = function(i) {
         dropRef(i);
+    };
+
+    __exports.__wbindgen_string_new = function(p, l) {
+        return addHeapObject(getStringFromWasm(p, l));
     };
 
     __exports.__wbindgen_is_undefined = function(idx) {

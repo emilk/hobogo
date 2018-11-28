@@ -5,6 +5,7 @@ extern crate web_sys;
 use wasm_bindgen::prelude::*;
 
 mod hobogo;
+mod mcts;
 
 use self::hobogo::{Board, Coord, Player};
 
@@ -22,12 +23,6 @@ pub struct JsCoord {
 #[wasm_bindgen]
 pub fn game_over(board: &[i8]) -> bool {
     Board::from_js(board).game_over()
-}
-
-// How likely is the given player to win?
-#[wasm_bindgen]
-pub fn ai_evaluate(board: &[i8], player: u8) -> f64 {
-    Board::from_js(board).evaluate(player as Player)
 }
 
 #[wasm_bindgen]

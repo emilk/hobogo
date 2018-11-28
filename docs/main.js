@@ -22,9 +22,6 @@ function board_to_wasm(board) {
     }
     return wasm_board;
 }
-function ai_evaluate(board, player) {
-    return wasm_bindgen.ai_evaluate(board_to_wasm(board), player_to_wasm(player));
-}
 function ai_move(board, player) {
     return wasm_bindgen.ai_move(board_to_wasm(board), player_to_wasm(player));
 }
@@ -163,16 +160,6 @@ function paint_board(canvas, board, hovered) {
         }
         context.fillStyle = "white";
         context.fillText("parities: " + score.parities, 12, y);
-        y += 16;
-        y += 16;
-        context.fillText("AI advantages:", 12, y);
-        y += 16;
-        for (var pi = 0; pi < g_num_players; ++pi) {
-            var advantage = ai_evaluate(board, pi);
-            context.fillStyle = player_color(pi);
-            context.fillText(player_name(pi) + ": " + advantage.toFixed(3), 12, y);
-            y += 16;
-        }
     }
 }
 function get_mouse_pos(canvas, evt) {
