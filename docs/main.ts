@@ -28,12 +28,12 @@ function board_to_wasm(board) {
   return wasm_board;
 }
 
-function ai_move(board, player) {
+function ai_move(board, player: number) {
   return wasm_bindgen.ai_move(board_to_wasm(board), player_to_wasm(player));
 }
 
-function game_over(board) {
-  return wasm_bindgen.game_over(board_to_wasm(board));
+function game_over(board, num_players: number) {
+  return wasm_bindgen.game_over(board_to_wasm(board), num_players);
 }
 
 // ----------------------------------------------------------------------------
@@ -174,7 +174,7 @@ function paint_board(canvas, board, hovered) {
   {
     let y = board.length * g_cell_size + 64;
     context.font = `12pt ${FONT}`;
-    if (game_over(board)) {
+    if (game_over(board, g_num_players)) {
       context.fillStyle = "white";
       context.fillText(`GAME OVER`, 12, y);
     } else {
@@ -363,7 +363,7 @@ function make_move(board, coord, player) {
   board = clone(board);
   board[coord.y][coord.x] = player;
 
-  if (game_over(board)) {
+  if (game_over(board, g_num_players)) {
     board = fill_in(board);
   }
 

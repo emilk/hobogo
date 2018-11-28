@@ -21,8 +21,8 @@ pub struct JsCoord {
 }
 
 #[wasm_bindgen]
-pub fn game_over(board: &[i8]) -> bool {
-    Board::from_js(board).game_over()
+pub fn game_over(board: &[i8], num_players: usize) -> bool {
+    Board::from_js(board).game_over(num_players)
 }
 
 #[wasm_bindgen]

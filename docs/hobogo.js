@@ -18,12 +18,13 @@
     }
     /**
     * @param {Int8Array} arg0
+    * @param {number} arg1
     * @returns {boolean}
     */
-    __exports.game_over = function(arg0) {
+    __exports.game_over = function(arg0, arg1) {
         const [ptr0, len0] = passArray8ToWasm(arg0);
         try {
-            return (wasm.game_over(ptr0, len0)) !== 0;
+            return (wasm.game_over(ptr0, len0, arg1)) !== 0;
 
         } finally {
             wasm.__wbindgen_free(ptr0, len0 * 1);

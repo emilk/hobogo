@@ -47,6 +47,8 @@ impl Influence {
     }
 }
 
+pub type Points = [usize; MAX_PLAYERS];
+
 #[derive(Copy, Clone, Debug)]
 pub struct Coord {
     pub x: i32,
@@ -159,7 +161,25 @@ impl Board {
         return Influence::Tied;
     }
 
-    pub fn everything_is_ruled_by_someone(&self) -> bool {
+    fn num_players_with_valid_moves(&self, num_players: usize) -> usize {
+        assert!(num_players <= MAX_PLAYERS);
+        let mut num_moves = [0; MAX_PLAYERS];
+        for influence in self.coords().map(|c| self.influence(c)) {
+            match influence {
+                Influence::Occupied(_) => (),
+                Influence::Ruled(player) => num_moves[player as usize] += 1,
+                Influence::Claimed(player) => num_moves[player as usize] += 1,
+                Influence::Tied => {
+                    return num_players;
+                }
+            }
+        }
+        (0..num_players)
+            .filter(|&player| num_moves[player] > 0)
+            .count()
+    }
+
+    fn everything_is_ruled_by_someone(&self) -> bool {
         self.coords()
             .map(|c| self.influence(c))
             .all(|influence| match influence {
@@ -170,33 +190,51 @@ impl Board {
             })
     }
 
-    pub fn one_player_has_more_than_half(&self) -> bool {
-        let mut points = [0; MAX_PLAYERS];
+    fn one_player_has_unbeatable_lead(&self) -> bool {
+        let mut guaranteed_points = [0; MAX_PLAYERS];
+        let mut contested = 0;
         for influence in self.coords().map(|c| self.influence(c)) {
             match influence {
-                Influence::Occupied(player) => points[player as usize] += 1,
-                Influence::Ruled(player) => points[player as usize] += 1,
-                Influence::Claimed(_) => (),
-                Influence::Tied => (),
+                Influence::Occupied(player) => guaranteed_points[player as usize] += 1,
+                Influence::Ruled(player) => guaranteed_points[player as usize] += 1,
+                Influence::Claimed(_) => contested += 1,
+                Influence::Tied => contested += 1,
             }
         }
-        points
-            .iter()
-            .any(|&point| point > self.width * self.height / 2)
+
+        let mut most_points = 0;
+        let mut second_most_points = 0;
+        for &point in guaranteed_points.iter() {
+            if point > most_points {
+                second_most_points = most_points;
+                most_points = point;
+            } else if point > second_most_points {
+                second_most_points = point;
+            }
+        }
+
+        most_points > second_most_points + contested
     }
 
-    pub fn game_over(&self) -> bool {
-        // TODO: check if only one player has a move
-        self.everything_is_ruled_by_someone() || self.one_player_has_more_than_half()
+    pub fn game_over(&self, num_players: usize) -> bool {
+        self.num_players_with_valid_moves(num_players) < 2
+            || self.everything_is_ruled_by_someone()
+            || self.one_player_has_unbeatable_lead()
     }
 
-    pub fn leaders(&self) -> Vec<Player> {
+    /// Given that the game is over, what are the scores?
+    pub fn points(&self) -> Points {
         let mut points = [0; MAX_PLAYERS];
         for influence in self.coords().map(|c| self.influence(c)) {
             if let Some(player) = influence.player() {
                 points[player as usize] += 1usize;
             }
         }
+        points
+    }
+
+    pub fn leaders(&self) -> Vec<Player> {
+        let points = self.points();
 
         let leader_score: usize = *points.iter().max().unwrap();
         if leader_score == 0 {
@@ -218,8 +256,8 @@ impl Board {
         }
     }
 
-    pub fn winner(&self) -> Option<Player> {
-        if self.game_over() {
+    pub fn winner(&self, num_players: usize) -> Option<Player> {
+        if self.game_over(num_players) {
             self.leader()
         } else {
             None
