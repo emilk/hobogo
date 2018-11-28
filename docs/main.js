@@ -5,7 +5,7 @@ function wasm_loaded() {
 }
 // here we tell bindgen the path to the wasm file so it can start
 // initialization and return to us a promise when it's done
-wasm_bindgen('./hobogo_bg.wasm')
+wasm_bindgen("./hobogo_bg.wasm")
     .then(wasm_loaded)["catch"](console.error);
 function player_to_wasm(player) {
     return player === null ? -1 : player;
@@ -13,9 +13,11 @@ function player_to_wasm(player) {
 function board_to_wasm(board) {
     var wasm_board = new Int8Array(board.length * board[0].length);
     var i = 0;
-    for (var y = 0; y < board.length; ++y) {
-        for (var x = 0; x < board[y].length; ++x) {
-            wasm_board[i++] = player_to_wasm(board[y][x]);
+    for (var _i = 0, board_1 = board; _i < board_1.length; _i++) {
+        var row = board_1[_i];
+        for (var _a = 0, row_1 = row; _a < row_1.length; _a++) {
+            var cell = row_1[_a];
+            wasm_board[i++] = player_to_wasm(cell);
         }
     }
     return wasm_board;
@@ -34,7 +36,7 @@ function player_name(player) {
     if (player === 0) {
         return "red ";
     }
-    else if (player == 1) {
+    else if (player === 1) {
         return "blue";
     }
     else {
@@ -94,28 +96,28 @@ function hovered_cell(board, mouse_pos) {
 }
 var PAINT_INFLUENCE = true;
 function paint_board(canvas, board, hovered) {
-    var FONT = 'monospace';
+    var FONT = "monospace";
     board = make_move(board, hovered, g_current_player) || board; // PREVIEW!
-    var context = canvas.getContext('2d');
+    var context = canvas.getContext("2d");
     context.fillStyle = "#111111";
     context.clearRect(0, 0, canvas.width, canvas.height);
-    for (var y_1 = 0; y_1 < board.length; ++y_1) {
-        for (var x = 0; x < board[y_1].length; ++x) {
+    for (var y = 0; y < board.length; ++y) {
+        for (var x = 0; x < board[y].length; ++x) {
             var pad = 2;
             var left = x * g_cell_size + pad;
-            var top_2 = y_1 * g_cell_size + pad;
+            var top_2 = y * g_cell_size + pad;
             var right = (x + 1) * g_cell_size - pad;
-            var bottom = (y_1 + 1) * g_cell_size - pad;
-            context.fillStyle = cell_color(board, { x: x, y: y_1 });
+            var bottom = (y + 1) * g_cell_size - pad;
+            context.fillStyle = cell_color(board, { x: x, y: y });
             context.fillRect(left, top_2, right - left, bottom - top_2);
-            if (board[y_1][x] === null && PAINT_INFLUENCE) {
-                var influences = influences_at(board, { x: x, y: y_1 });
-                if (g_num_players == 2) {
-                    if (influences[0] != influences[1]) {
+            if (board[y][x] === null && PAINT_INFLUENCE) {
+                var influences = influences_at(board, { x: x, y: y });
+                if (g_num_players === 2) {
+                    if (influences[0] !== influences[1]) {
                         var font_size = 10;
                         context.font = font_size + "pt " + FONT;
                         var player = influences[0] > influences[1] ? 0 : 1;
-                        var text = (influences[player] > num_neighbors(board, { x: x, y: y_1 }) / 2) ? 'X'
+                        var text = (influences[player] > num_neighbors(board, { x: x, y: y }) / 2) ? "X"
                             : "" + Math.abs(influences[player] - influences[1 - player]);
                         context.fillStyle = player_color(player);
                         context.fillText(text, (left + right) / 2 - font_size / 2, (top_2 + bottom) / 2 + font_size / 2);
@@ -137,38 +139,40 @@ function paint_board(canvas, board, hovered) {
             }
         }
     }
-    var y = board.length * g_cell_size + 16;
-    context.font = "12pt " + FONT;
-    if (game_over(board)) {
+    {
+        var y = board.length * g_cell_size + 16;
+        context.font = "12pt " + FONT;
+        if (game_over(board)) {
+            context.fillStyle = "white";
+            context.fillText("GAME OVER", 12, y);
+        }
+        else {
+            context.fillStyle = player_color(g_current_player);
+            context.fillText("Current player: " + player_name(g_current_player), 12, y);
+        }
+        y += 16;
+        y += 16;
         context.fillStyle = "white";
-        context.fillText("GAME OVER", 12, y);
-    }
-    else {
-        context.fillStyle = player_color(g_current_player);
-        context.fillText("Current player: " + player_name(g_current_player), 12, y);
-    }
-    y += 16;
-    y += 16;
-    context.fillStyle = 'white';
-    context.fillText("Score:", 12, y);
-    y += 16;
-    var score = get_score(board);
-    for (var pi = 0; pi < g_num_players; ++pi) {
-        context.fillStyle = player_color(pi);
-        context.fillText(player_name(pi) + ": " + score.certain[pi] + " (+ " + score.claimed[pi] + " claimed)", 12, y);
+        context.fillText("Score:", 12, y);
         y += 16;
-    }
-    context.fillStyle = 'white';
-    context.fillText("parities: " + score.parities, 12, y);
-    y += 16;
-    y += 16;
-    context.fillText("AI advantages:", 12, y);
-    y += 16;
-    for (var pi = 0; pi < g_num_players; ++pi) {
-        var advantage = ai_evaluate(board, pi);
-        context.fillStyle = player_color(pi);
-        context.fillText(player_name(pi) + ": " + advantage.toFixed(3), 12, y);
+        var score = get_score(board);
+        for (var pi = 0; pi < g_num_players; ++pi) {
+            context.fillStyle = player_color(pi);
+            context.fillText(player_name(pi) + ": " + score.certain[pi] + " (+ " + score.claimed[pi] + " claimed)", 12, y);
+            y += 16;
+        }
+        context.fillStyle = "white";
+        context.fillText("parities: " + score.parities, 12, y);
         y += 16;
+        y += 16;
+        context.fillText("AI advantages:", 12, y);
+        y += 16;
+        for (var pi = 0; pi < g_num_players; ++pi) {
+            var advantage = ai_evaluate(board, pi);
+            context.fillStyle = player_color(pi);
+            context.fillText(player_name(pi) + ": " + advantage.toFixed(3), 12, y);
+            y += 16;
+        }
     }
 }
 function get_mouse_pos(canvas, evt) {
@@ -178,7 +182,7 @@ function get_mouse_pos(canvas, evt) {
         y: evt.clientY - rect.top
     };
 }
-var g_canvas = document.getElementById('hobo_canvas');
+var g_canvas = document.getElementById("hobo_canvas");
 var g_num_players = 2;
 function array(n, value_maker) {
     var board = [];
@@ -188,7 +192,7 @@ function array(n, value_maker) {
     return board;
 }
 function make_board(n) {
-    return array(n, function (_) { return array(n, function (_) { return null; }); });
+    return array(n, function (_) { return array(n, function (__) { return null; }); });
 }
 function is_board_at(board, coord) {
     if (coord.x < 0 || board[0].length <= coord.x) {
@@ -203,25 +207,25 @@ function board_at(board, coord) {
     return is_board_at(board, coord) ? board[coord.y][coord.x] : null;
 }
 function num_neighbors(board, coord) {
-    var num_neighbors = 0;
+    var num = 0;
     for (var dy = -1; dy <= +1; ++dy) {
         for (var dx = -1; dx <= +1; ++dx) {
-            if (dx == 0 && dy == 0) {
+            if (dx === 0 && dy === 0) {
                 continue;
             }
             var neighbor_coord = { x: coord.x + dx, y: coord.y + dy };
             if (is_board_at(board, neighbor_coord)) {
-                num_neighbors += 1;
+                num += 1;
             }
         }
     }
-    return num_neighbors;
+    return num;
 }
 function influences_at(board, coord) {
     var influences = array(g_num_players, function (_) { return 0; });
     for (var dy = -1; dy <= +1; ++dy) {
         for (var dx = -1; dx <= +1; ++dx) {
-            if (dx == 0 && dy == 0) {
+            if (dx === 0 && dy === 0) {
                 continue;
             }
             var neighbor_coord = { x: coord.x + dx, y: coord.y + dy };
@@ -256,7 +260,7 @@ function claimed_by(board, coord) {
     for (var player = 0; player < g_num_players; ++player) {
         var somebody_else_is_as_large = false;
         for (var other = 0; other < g_num_players; ++other) {
-            if (player != other && influences[other] >= influences[player]) {
+            if (player !== other && influences[other] >= influences[player]) {
                 somebody_else_is_as_large = true;
             }
         }
@@ -301,7 +305,7 @@ function fill_in(old_board) {
     return new_board;
 }
 function is_valid_move(board, coord, player) {
-    if (coord == null) {
+    if (coord === null) {
         return false;
     }
     if (coord.x < 0 || board[0].length <= coord.x) {
@@ -338,16 +342,16 @@ function make_move(board, coord, player) {
 var g_board = make_board(7);
 var g_current_player = 0;
 function start_game() {
-    g_canvas.addEventListener('mousemove', function (evt) {
+    g_canvas.addEventListener("mousemove", function (evt) {
         var mouse_pos = get_mouse_pos(g_canvas, evt);
         var hovered = hovered_cell(g_board, mouse_pos);
         paint_board(g_canvas, g_board, hovered);
     }, false);
-    g_canvas.addEventListener('mousedown', function (evt) {
+    g_canvas.addEventListener("mousedown", function (evt) {
         var mouse_pos = get_mouse_pos(g_canvas, evt);
         var hovered = hovered_cell(g_board, mouse_pos);
         try_make_move(hovered);
-        if (g_current_player == 1) {
+        if (g_current_player === 1) {
             make_ai_move();
         }
         paint_board(g_canvas, g_board, hovered);

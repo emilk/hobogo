@@ -10,6 +10,9 @@ fi
 # Build rust:
 cargo build --target wasm32-unknown-unknown
 
+# Lint and clean up typescript:
+tslint --fix docs/*.ts
+
 # Compile typescript:
 tsc
 
