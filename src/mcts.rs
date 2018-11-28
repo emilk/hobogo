@@ -20,6 +20,8 @@ pub struct GameState {
     pub board: Board,
 }
 
+pub type Score = Vec<f64>;
+
 impl GameState {
     fn available_moves(&self) -> Vec<Action> {
         self.board
@@ -34,6 +36,7 @@ impl GameState {
         if false {
             self.available_moves().choose(rng).cloned()
         } else {
+            // Faster
             let mut coords: Vec<Action> = self.board.coords().collect();
             coords.shuffle(rng);
             for coord in coords {
@@ -50,8 +53,38 @@ impl GameState {
         self.next_player = (self.next_player + 1) % (self.num_players as u8);
     }
 
-    fn winner(&self) -> Option<Player> {
-        self.board.winner()
+    /// Only called when one player cannot make a move (game over).
+    fn score(&self) -> Score {
+        let points = self.board.points();
+        let mut winner = 0;
+        let mut runner_up = 0;
+        for player in 0..self.num_players {
+            if points[player] > points[winner] {
+                runner_up = winner;
+                winner = player;
+            } else if points[player] > runner_up {
+                runner_up = player;
+            }
+        }
+
+        let win_margin = points[winner] - points[runner_up];
+        assert!(win_margin >= 0);
+
+        if win_margin == 0 {
+            // A tie: not good, but better than loosing
+            vec![0.1; self.num_players]
+        } else {
+            let margin_score = (win_margin as f64) / 100.0; // ARBRITRARY
+            let mut score = vec![-margin_score; self.num_players];
+            score[winner] = 1.0 + margin_score;
+            score
+        }
+
+        // let mut score = vec![0.0; self.num_players];
+        // if let Some(player) = self.board.winner(self.num_players) {
+        //     score[player as usize] = 1.0;
+        // }
+        // score
     }
 }
 
@@ -72,7 +105,7 @@ struct Node {
     num: usize,
 
     /// Score for this node:s player.
-    num_wins: usize,
+    score_sum: f64,
 
     /// All available actions from here.
     children: Option<Vec<(Action, Node)>>,
@@ -82,7 +115,7 @@ impl Node {
     fn new() -> Node {
         Node {
             num: 0,
-            num_wins: 0,
+            score_sum: 0.0,
             children: None,
         }
     }
@@ -119,7 +152,7 @@ impl Node {
             }
 
             // UCT (Upper Confidence Tree):
-            let value = (child.num_wins as f64) / (child.num as f64)
+            let value = child.score_sum / (child.num as f64)
                 + (2.0 * self_num_ln / (child.num as f64)).sqrt();
             if value > best_value {
                 best_value = value;
@@ -131,28 +164,23 @@ impl Node {
     }
 
     // Recursively play, returns the winner.
-    fn iterate<R: Rng>(&mut self, rng: &mut R, mut state: GameState) -> Option<Player> {
+    fn iterate<R: Rng>(&mut self, rng: &mut R, mut state: GameState) -> Score {
         // Which player the current node is trying to win for:
         let optimizing_player = 1 - state.next_player; // TODO: fix this uglyness.
 
-        let winner = if self.num == 0 {
-            random_playout(rng, state).winner()
+        let score = if self.num == 0 {
+            random_playout(rng, state).score()
         } else if let Some((action, child)) = self.next_child(rng, &state) {
             state.make_move(&action);
             child.iterate(rng, state)
         } else {
             // No children. We are a leaf.
-            state.winner()
+            state.score()
         };
 
         self.num += 1;
-
-        // TODO: count ties as half-points (they are better than losses, after all).
-        if winner == Some(optimizing_player) {
-            self.num_wins += 1;
-        }
-
-        winner
+        self.score_sum += score[optimizing_player as usize];
+        score
     }
 
     fn best_action(&self) -> Option<&Action> {
@@ -160,6 +188,7 @@ impl Node {
             Some(children) => {
                 let mut best_action = None;
                 let mut most_explored = 0;
+                // TODO: score_sum as tie-breaker!
                 for (action, child) in children {
                     if child.num > most_explored {
                         most_explored = child.num;
@@ -179,7 +208,7 @@ impl fmt::Display for Node {
             writeln!(
                 f,
                 "mean score: {} over {} playouts",
-                (node.num_wins as f64) / (node.num as f64),
+                (node.score_sum as f64) / (node.num as f64),
                 node.num
             )?;
             if let Some(children) = &node.children {
