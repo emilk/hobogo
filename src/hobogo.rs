@@ -254,7 +254,6 @@ impl Board {
         let mut rng = rand::rngs::SmallRng::from_rng(&mut rng).unwrap(); // Fast
 
         let state = mcts::GameState {
-            ai_player: player,
             next_player: player,
             num_players: 2, // TODO
             board: self.clone(),

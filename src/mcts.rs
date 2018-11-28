@@ -12,9 +12,6 @@ type Action = Coord;
 // TODO: traitify
 #[derive(Clone)]
 pub struct GameState {
-    /// Who are we playing?
-    pub ai_player: Player,
-
     /// Who is making the next turn?
     pub next_player: Player,
 
@@ -53,13 +50,8 @@ impl GameState {
         self.next_player = (self.next_player + 1) % (self.num_players as u8);
     }
 
-    /// How much is this state worth? e.g. 1 for win, -1 for loss.
-    fn score(&self) -> f64 {
-        match self.board.winner() {
-            Some(player) if player == self.ai_player => 1.0,
-            Some(_) => 0.0,
-            None => 0.5,
-        }
+    fn winner(&self) -> Option<Player> {
+        self.board.winner()
     }
 }
 
@@ -74,9 +66,13 @@ fn random_playout<R: Rng>(rng: &mut R, mut state: GameState) -> GameState {
 
 // ----------------------------------------------------------------------------
 
+/// Each node has an implicit current player, passed down via the game state.
 struct Node {
+    /// Number plays from this node
     num: usize,
-    score_sum: f64,
+
+    /// Score for this node:s player.
+    num_wins: usize,
 
     /// All available actions from here.
     children: Option<Vec<(Action, Node)>>,
@@ -86,7 +82,7 @@ impl Node {
     fn new() -> Node {
         Node {
             num: 0,
-            score_sum: 0.0,
+            num_wins: 0,
             children: None,
         }
     }
@@ -123,7 +119,7 @@ impl Node {
             }
 
             // UCT (Upper Confidence Tree):
-            let value = child.score_sum / (child.num as f64)
+            let value = (child.num_wins as f64) / (child.num as f64)
                 + (2.0 * self_num_ln / (child.num as f64)).sqrt();
             if value > best_value {
                 best_value = value;
@@ -134,25 +130,29 @@ impl Node {
         best
     }
 
-    // Recursively play, returns the score.
-    fn iterate<R: Rng>(&mut self, rng: &mut R, mut state: GameState) -> f64 {
-        if self.num == 0 {
-            let score = random_playout(rng, state).score();
-            self.num += 1;
-            self.score_sum += score;
-            score
+    // Recursively play, returns the winner.
+    fn iterate<R: Rng>(&mut self, rng: &mut R, mut state: GameState) -> Option<Player> {
+        // Which player the current node is trying to win for:
+        let optimizing_player = 1 - state.next_player; // TODO: fix this uglyness.
+
+        let winner = if self.num == 0 {
+            random_playout(rng, state).winner()
+        } else if let Some((action, child)) = self.next_child(rng, &state) {
+            state.make_move(&action);
+            child.iterate(rng, state)
         } else {
-            let delta = if let Some((action, child)) = self.next_child(rng, &state) {
-                state.make_move(&action);
-                child.iterate(rng, state)
-            } else {
-                // No children. We are a leaf.
-                state.score()
-            };
-            self.num += 1;
-            self.score_sum += delta;
-            delta
+            // No children. We are a leaf.
+            state.winner()
+        };
+
+        self.num += 1;
+
+        // TODO: count ties as half-points (they are better than losses, after all).
+        if winner == Some(optimizing_player) {
+            self.num_wins += 1;
         }
+
+        winner
     }
 
     fn best_action(&self) -> Option<&Action> {
@@ -188,9 +188,9 @@ impl fmt::Display for Node {
                 for (action, child) in children.iter() {
                     if child.num > 0 {
                         for _ in 0..indent_level {
-                            f.write_str("    ")?;
+                            f.write_str("|   ")?;
                         }
-                        write!(f, "{:?}:", action)?;
+                        write!(f, "{}: ", action)?; // TODO: print player name?
                         fmt_subtree(f, child, indent_level + 1)?;
                     }
                 }

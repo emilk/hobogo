@@ -8,3 +8,6 @@ Hobogo is a a pencil-and-paper board game played on a 7x7 grid. Each player has 
 
 ## The web version
 You can play against an AI here: https://emilk.github.io/hobogo/index.html
+
+## The AI
+The AI is doing blind Monte Carlo Tree Search for one second.
