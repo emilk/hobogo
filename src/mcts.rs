@@ -105,59 +105,54 @@ impl Node {
         self.children.as_mut().unwrap().iter_mut()
     }
 
-    fn iterate_child<R: Rng>(&mut self, rng: &mut R, mut state: GameState) -> f64 {
-        // First try to find an unexplored child:
-        for (action, child) in self.children_mut(rng, &state) {
-            if child.num == 0 {
-                state.make_move(action);
-                return child.playout(rng, state);
-            }
-        }
-
-        // All children has been explored at least once.
-        // Find the best one to recurse on:
-
+    // Find the next child to recurse on
+    fn next_child<R: Rng>(
+        &mut self,
+        rng: &mut R,
+        state: &GameState,
+    ) -> Option<(Action, &mut Node)> {
         let mut best_value: f64 = std::f64::NEG_INFINITY;
-        let mut best_action = None;
-        let mut best_child = None;
+        let mut best = None;
 
         let self_num_ln = (self.num as f64).ln();
 
         for (action, child) in self.children_mut(rng, &state) {
+            if child.num == 0 {
+                // Unexpanded child – prioritize over all others
+                return Some((action.clone(), child));
+            }
+
             // UCT (Upper Confidence Tree):
-            let c = 1.0; // TODO
             let value = child.score_sum / (child.num as f64)
-                + c * (2.0 * self_num_ln / (child.num as f64)).sqrt();
+                + (2.0 * self_num_ln / (child.num as f64)).sqrt();
             if value > best_value {
                 best_value = value;
-                best_action = Some(action);
-                best_child = Some(child);
+                best = Some((action.clone(), child))
             }
         }
 
-        if let Some(best_action) = best_action {
-            state.make_move(best_action);
-            best_child.unwrap().iterate(rng, state)
-        } else {
-            // No children. We are a leaf.
-            state.score()
-        }
+        best
     }
 
     // Recursively play, returns the score.
-    fn iterate<R: Rng>(&mut self, rng: &mut R, state: GameState) -> f64 {
-        let delta = self.iterate_child(rng, state);
-        self.num += 1;
-        self.score_sum += delta;
-        delta
-    }
-
-    fn playout<R: Rng>(&mut self, rng: &mut R, state: GameState) -> f64 {
-        let result = random_playout(rng, state);
-        let score = result.score();
-        self.num += 1;
-        self.score_sum += score;
-        score
+    fn iterate<R: Rng>(&mut self, rng: &mut R, mut state: GameState) -> f64 {
+        if self.num == 0 {
+            let score = random_playout(rng, state).score();
+            self.num += 1;
+            self.score_sum += score;
+            score
+        } else {
+            let delta = if let Some((action, child)) = self.next_child(rng, &state) {
+                state.make_move(&action);
+                child.iterate(rng, state)
+            } else {
+                // No children. We are a leaf.
+                state.score()
+            };
+            self.num += 1;
+            self.score_sum += delta;
+            delta
+        }
     }
 
     fn best_action(&self) -> Option<&Action> {
@@ -191,6 +186,8 @@ impl fmt::Display for Node {
                 node.num
             )?;
             if let Some(children) = &node.children {
+                let mut children: Vec<&(Action, Node)> = children.iter().collect();
+                children.sort_by_key(|(_, node)| std::usize::MAX - node.num);
                 for (action, child) in children.iter() {
                     if child.num > 0 {
                         for _ in 0..indent_level {
