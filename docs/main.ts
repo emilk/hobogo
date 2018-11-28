@@ -157,8 +157,22 @@ function paint_board(canvas, board, hovered) {
     }
   }
 
+  // Columns: A, B, C, D, ...
+  for (let x = 0; x < board[0].length; ++x) {
+    context.font = `12pt ${FONT}`;
+    context.fillStyle = "white";
+    context.fillText(`${String.fromCharCode(x + 65)}`, (x + 0.5) * g_cell_size - 6, board.length * g_cell_size + 12);
+  }
+
+  // Rows: 1, 2, 3, ...
+  for (let y = 0; y < board[0].length; ++y) {
+    context.font = `12pt ${FONT}`;
+    context.fillStyle = "white";
+    context.fillText(`${y + 1}`, board[0].length * g_cell_size + 12, (y + 0.5) * g_cell_size);
+  }
+
   {
-    let y = board.length * g_cell_size + 16;
+    let y = board.length * g_cell_size + 64;
     context.font = `12pt ${FONT}`;
     if (game_over(board)) {
       context.fillStyle = "white";

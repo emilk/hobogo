@@ -176,13 +176,10 @@ impl Node {
 impl fmt::Display for Node {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         fn fmt_subtree(f: &mut fmt::Formatter, node: &Node, indent_level: i32) -> fmt::Result {
-            for _ in 0..indent_level {
-                f.write_str("    ")?;
-            }
             writeln!(
                 f,
-                "mean_score: {} over {} playouts",
-                node.score_sum / (node.num as f64),
+                "mean score: {} over {} playouts",
+                (node.num_wins as f64) / (node.num as f64),
                 node.num
             )?;
             if let Some(children) = &node.children {
