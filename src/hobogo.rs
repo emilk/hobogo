@@ -21,7 +21,7 @@ fn player_from_i8(x: i8) -> Cell {
 }
 
 #[derive(Copy, Clone, Debug)]
-enum Influence {
+pub enum Influence {
     // This player occupies this cell
     Occupied(Player),
 
@@ -105,7 +105,7 @@ impl Board {
         }
     }
 
-    fn influence(&self, c: Coord) -> Influence {
+    pub fn influence(&self, c: Coord) -> Influence {
         if let Some(player) = self.at(c) {
             return Influence::Occupied(player);
         }

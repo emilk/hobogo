@@ -1,12 +1,14 @@
+use std::collections::VecDeque;
 use std::fmt;
 
-use rand::Rng;
+use rand::{seq::SliceRandom, Rng};
 
-use hobogo::{Board, Coord, Player};
+use hobogo::{Board, Coord, Influence, Player};
 
 // ----------------------------------------------------------------------------
 
 // TODO: traitify
+// NOTE: if a player wants to pass (in a game where that is allowed), then that is an action.
 type Action = Coord;
 
 // TODO: traitify
@@ -23,18 +25,21 @@ pub struct GameState {
 pub type Score = Vec<f64>;
 
 impl GameState {
-    fn available_moves(&self) -> Vec<Action> {
+    fn available_actions_for(&self, player: Player) -> Vec<Action> {
         self.board
             .coords()
-            .filter(|c| self.board.is_valid_move(*c, self.next_player))
+            .filter(|c| self.board.is_valid_move(*c, player))
             .collect()
+    }
+
+    fn available_actions(&self) -> Vec<Action> {
+        self.available_actions_for(self.next_player)
     }
 
     fn random_action<R: Rng>(&self, rng: &mut R) -> Option<Action> {
         // TODO: prefer smart actions
-        use rand::seq::SliceRandom;
         if false {
-            self.available_moves().choose(rng).cloned()
+            self.available_actions().choose(rng).cloned()
         } else {
             // Faster
             let mut coords: Vec<Action> = self.board.coords().collect();
@@ -48,12 +53,12 @@ impl GameState {
         }
     }
 
-    fn make_move(&mut self, action: &Action) {
+    fn take_action(&mut self, action: &Action) {
         self.board.set(*action, self.next_player);
         self.next_player = (self.next_player + 1) % (self.num_players as u8);
     }
 
-    /// Only called when one player cannot make a move (game over).
+    /// Only called when one player has no action to take (game over).
     fn score(&self) -> Score {
         let points = self.board.points();
         let mut winner = 0;
@@ -67,8 +72,8 @@ impl GameState {
             }
         }
 
+        assert!(points[winner] >= points[runner_up]);
         let win_margin = points[winner] - points[runner_up];
-        assert!(win_margin >= 0);
 
         if win_margin == 0 {
             // A tie: not good, but better than loosing
@@ -79,22 +84,61 @@ impl GameState {
             score[winner] = 1.0 + margin_score;
             score
         }
-
-        // let mut score = vec![0.0; self.num_players];
-        // if let Some(player) = self.board.winner(self.num_players) {
-        //     score[player as usize] = 1.0;
-        // }
-        // score
     }
-}
 
-// ----------------------------------------------------------------------------
-
-fn random_playout<R: Rng>(rng: &mut R, mut state: GameState) -> GameState {
-    while let Some(action) = state.random_action(rng) {
-        state.make_move(&action)
+    fn next_action_from_deque(
+        &self,
+        actions: &mut VecDeque<Action>,
+        active_player: Player,
+    ) -> Option<Action> {
+        for _ in 0..actions.len() {
+            let action = actions.pop_front().unwrap();
+            match self.board.influence(action) {
+                Influence::Occupied(_) => {}
+                Influence::Ruled(ruler) if ruler != active_player => {}
+                Influence::Claimed(claimer) if claimer != active_player => {
+                    actions.push_back(action); // Try again later
+                }
+                _ => {
+                    return Some(action);
+                }
+            };
+        }
+        None
     }
-    state
+
+    fn random_playout<R: Rng>(&mut self, rng: &mut R) {
+        if false {
+            while let Some(action) = self.random_action(rng) {
+                self.take_action(&action)
+            }
+        } else {
+            // Almost twice as fast as the one above.
+
+            // Keep a list of available actions for each player:
+            let mut player_actions: Vec<Vec<Action>> = (0..self.num_players)
+                .map(|p| self.available_actions_for(p as Player))
+                .collect();
+            for player in 0..self.num_players {
+                player_actions[player].shuffle(rng);
+            }
+            let mut player_actions: Vec<VecDeque<Action>> = player_actions
+                .into_iter()
+                .map(|v| v.into_iter().collect())
+                .collect();
+
+            loop {
+                let next_player = self.next_player;
+                let action_list = &mut player_actions[next_player as usize];
+                // if let Some(action) = self.next_action_from_vec(action_list, next_player) {
+                if let Some(action) = self.next_action_from_deque(action_list, next_player) {
+                    self.take_action(&action);
+                } else {
+                    break;
+                }
+            }
+        }
+    }
 }
 
 // ----------------------------------------------------------------------------
@@ -126,10 +170,15 @@ impl Node {
         state: &GameState,
     ) -> impl Iterator<Item = &mut (Action, Node)> {
         if self.children.is_none() {
-            let mut moves = state.available_moves();
+            let mut actions = state.available_actions();
             use rand::prelude::*;
-            moves.shuffle(rng); // TODO try to keep best moves in front
-            self.children = Some(moves.iter().map(|&action| (action, Node::new())).collect())
+            actions.shuffle(rng); // TODO try to keep best actions in front
+            self.children = Some(
+                actions
+                    .iter()
+                    .map(|&action| (action, Node::new()))
+                    .collect(),
+            )
         }
         self.children.as_mut().unwrap().iter_mut()
     }
@@ -169,9 +218,10 @@ impl Node {
         let optimizing_player = 1 - state.next_player; // TODO: fix this uglyness.
 
         let score = if self.num == 0 {
-            random_playout(rng, state).score()
+            state.random_playout(rng);
+            state.score()
         } else if let Some((action, child)) = self.next_child(rng, &state) {
-            state.make_move(&action);
+            state.take_action(&action);
             child.iterate(rng, state)
         } else {
             // No children. We are a leaf.
@@ -211,6 +261,9 @@ impl fmt::Display for Node {
                 (node.score_sum as f64) / (node.num as f64),
                 node.num
             )?;
+            if indent_level > 1 {
+                return Ok(());
+            }
             if let Some(children) = &node.children {
                 let mut children: Vec<&(Action, Node)> = children.iter().collect();
                 children.sort_by_key(|(_, node)| std::usize::MAX - node.num);
