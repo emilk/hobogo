@@ -36,12 +36,13 @@
     /**
     * @param {Int8Array} arg0
     * @param {number} arg1
+    * @param {number} arg2
     * @returns {JsCoord}
     */
-    __exports.ai_move = function(arg0, arg1) {
+    __exports.ai_move = function(arg0, arg1, arg2) {
         const [ptr0, len0] = passArray8ToWasm(arg0);
         try {
-            return JsCoord.__wrap(wasm.ai_move(ptr0, len0, arg1));
+            return JsCoord.__wrap(wasm.ai_move(ptr0, len0, arg1, arg2));
 
         } finally {
             wasm.__wbindgen_free(ptr0, len0 * 1);
@@ -50,7 +51,9 @@
 
     };
 
-    const __widl_f_log_1__target = console.log;
+    const __widl_f_now_Performance_target = typeof Performance === 'undefined' ? null : Performance.prototype.now || function() {
+        throw new Error(`wasm-bindgen: Performance.now does not exist`);
+    };
 
     const stack = [];
 
@@ -66,14 +69,6 @@
 
         }
     }
-
-    __exports.__widl_f_log_1_ = function(arg0) {
-        __widl_f_log_1__target(getObject(arg0));
-    };
-
-    const __widl_f_now_Performance_target = typeof Performance === 'undefined' ? null : Performance.prototype.now || function() {
-        throw new Error(`wasm-bindgen: Performance.now does not exist`);
-    };
 
     __exports.__widl_f_now_Performance = function(arg0) {
         return __widl_f_now_Performance_target.call(getObject(arg0));
@@ -105,6 +100,12 @@
         const val = getObject(arg0).performance;
         return isLikeNone(val) ? 0 : addHeapObject(val);
 
+    };
+
+    const __widl_f_log_1__target = console.log;
+
+    __exports.__widl_f_log_1_ = function(arg0) {
+        __widl_f_log_1__target(getObject(arg0));
     };
 
     let cachedTextDecoder = new TextDecoder('utf-8');

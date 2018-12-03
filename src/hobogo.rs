@@ -45,6 +45,15 @@ impl Influence {
             Influence::Tied => None,
         }
     }
+
+    pub fn is_occupied(&self) -> bool {
+        match self {
+            Influence::Occupied(_) => true,
+            Influence::Ruled(_) => false,
+            Influence::Claimed(_) => false,
+            Influence::Tied => false,
+        }
+    }
 }
 
 pub type Points = [usize; MAX_PLAYERS];
@@ -96,21 +105,24 @@ impl Board {
         (0..height).flat_map(move |y| (0..width).map(move |x| Coord { x, y }))
     }
 
-    pub fn is_valid_move(&self, c: Coord, who_wants_to_move: Player) -> bool {
-        match self.influence(c) {
-            Influence::Occupied(_) => false,
-            Influence::Ruled(ruler) => ruler == who_wants_to_move,
-            Influence::Claimed(claimer) => claimer == who_wants_to_move,
-            Influence::Tied => true,
+    pub fn is_valid_move(&self, c: Coord, who_wants_to_move: Player, num_players: usize) -> bool {
+        if let Some(_) = self.at(c) {
+            return false;
         }
+
+        let (influences, _) = self.tally_neighbors(c);
+
+        for player in 0..num_players {
+            if influences[player] > influences[who_wants_to_move as usize] {
+                return false;
+            }
+        }
+
+        return true;
     }
 
-    pub fn influence(&self, c: Coord) -> Influence {
-        if let Some(player) = self.at(c) {
-            return Influence::Occupied(player);
-        }
-
-        let mut influcences: [u32; MAX_PLAYERS] = [0; MAX_PLAYERS];
+    pub fn tally_neighbors(&self, c: Coord) -> ([u32; MAX_PLAYERS], u32) {
+        let mut influences: [u32; MAX_PLAYERS] = [0; MAX_PLAYERS];
         let mut _num_neighbors = 0;
         let mut empty_neighbors = 0;
         for dy in -1..=1 {
@@ -126,13 +138,23 @@ impl Board {
                     _num_neighbors += 1;
                     // TODO: this function should recurse. If a neighbor is ruled by another, we should not count it as a potential empty_neighbor
                     if let Some(player) = self.at(neighbor_coord) {
-                        influcences[player as usize] += 1;
+                        influences[player as usize] += 1;
                     } else {
                         empty_neighbors += 1;
                     }
                 }
             }
         }
+
+        (influences, empty_neighbors)
+    }
+
+    pub fn influence(&self, c: Coord) -> Influence {
+        if let Some(player) = self.at(c) {
+            return Influence::Occupied(player);
+        }
+
+        let (influences, empty_neighbors) = self.tally_neighbors(c);
 
         // Check if we have a ruler:
         for player in 0..MAX_PLAYERS {
@@ -143,10 +165,10 @@ impl Board {
                 if other_player == player {
                     continue;
                 }
-                if influcences[other_player] + empty_neighbors >= influcences[player] {
+                if influences[other_player] + empty_neighbors >= influences[player] {
                     other_player_can_take_this = true;
                 }
-                if influcences[other_player] >= influcences[player] {
+                if influences[other_player] >= influences[player] {
                     other_player_is_as_influential = true;
                 }
             }
@@ -158,11 +180,16 @@ impl Board {
                 return Influence::Claimed(player as Player);
             }
         }
+        // TODO: returned which players are tied!!
         return Influence::Tied;
     }
 
-    fn num_players_with_valid_moves(&self, num_players: usize) -> usize {
-        assert!(num_players <= MAX_PLAYERS);
+    fn more_than_one_player_has_valid_move(&self, num_players: usize) -> bool {
+        assert!(
+            num_players <= MAX_PLAYERS,
+            "Too many players: {}",
+            num_players
+        );
         let mut num_moves = [0; MAX_PLAYERS];
         for influence in self.coords().map(|c| self.influence(c)) {
             match influence {
@@ -170,13 +197,14 @@ impl Board {
                 Influence::Ruled(player) => num_moves[player as usize] += 1,
                 Influence::Claimed(player) => num_moves[player as usize] += 1,
                 Influence::Tied => {
-                    return num_players;
+                    return true;
                 }
             }
         }
-        (0..num_players)
+        let num_players_with_valid_moves = (0..num_players)
             .filter(|&player| num_moves[player] > 0)
-            .count()
+            .count();
+        num_players_with_valid_moves > 1
     }
 
     fn everything_is_ruled_by_someone(&self) -> bool {
@@ -217,7 +245,7 @@ impl Board {
     }
 
     pub fn game_over(&self, num_players: usize) -> bool {
-        self.num_players_with_valid_moves(num_players) < 2
+        !self.more_than_one_player_has_valid_move(num_players)
             || self.everything_is_ruled_by_someone()
             || self.one_player_has_unbeatable_lead()
     }
@@ -276,7 +304,7 @@ impl Board {
         }
     }
 
-    pub fn ai_move(&self, player: Player) -> Option<Coord> {
+    pub fn ai_move(&self, player: Player, num_players: usize) -> Option<Coord> {
         fn now_sec() -> f64 {
             web_sys::window()
                 .expect("should have a Window")
@@ -293,7 +321,7 @@ impl Board {
 
         let state = mcts::GameState {
             next_player: player,
-            num_players: 2, // TODO
+            num_players: num_players,
             board: self.clone(),
         };
 
@@ -310,6 +338,24 @@ impl Board {
             mcts.num_iterations() as f64 / (now_sec() - start)
         ));
         console_log(format!("{}", mcts));
-        mcts.best_action().cloned()
+        let action = mcts.best_action().cloned();
+        let action_str = if let Some(action) = action {
+            action.to_string()
+        } else {
+            "[GAME OVER]".to_string()
+        };
+        console_log(format!(
+            "Player {}/{} AI action: {}",
+            player, num_players, action_str
+        ));
+
+        if let Some(action) = action {
+            match action {
+                mcts::Action::Pass => None,
+                mcts::Action::Move(coord) => Some(coord),
+            }
+        } else {
+            None
+        }
     }
 }

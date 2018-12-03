@@ -26,9 +26,9 @@ pub fn game_over(board: &[i8], num_players: usize) -> bool {
 }
 
 #[wasm_bindgen]
-pub fn ai_move(board: &[i8], player: u8) -> JsCoord {
+pub fn ai_move(board: &[i8], player: u8, num_players: usize) -> JsCoord {
     let coord = Board::from_js(board)
-        .ai_move(player as Player)
+        .ai_move(player as Player, num_players)
         .unwrap_or(Coord { x: -1, y: -1 });
     JsCoord {
         x: coord.x,

@@ -3,8 +3,14 @@
   <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
   <head>
     <title>Hobogo</title>
+    <style>
+      body {
+        background: #0a244d;
+        color: #eef4f7;
+      }
+    </style>
   </head>
-  <body bgcolor="#000">
+  <body>
     <script>
       // The `--no-modules`-generated JS from `wasm-bindgen` attempts to use
       // `WebAssembly.instantiateStreaming` to instantiate the wasm module,
@@ -29,6 +35,48 @@
 
       The AI uses one second to think regardless of device, so it will be smarter on a desktop than on a mobile phone.
     </p>
+
+    <div>
+      <button onclick="new_game()">New game</button>
+    </div>
+
+    <div>
+      <input type="range" id="size" name="size" min="5" value="7" max="11" oninput="on_size_change(parseInt(this.value))" onchange="on_size_change(parseInt(this.value))">
+      <datalist id="tickmarks">
+        <option value="5" label="5">
+        <option value="6">
+        <option value="7" label="7">
+        <option value="8">
+        <option value="9" label="9">
+        <option value="10">
+        <option value="11" label="11">
+      </datalist>
+      <label id="size_label" for="size">Size: 7x7</label>
+    </div>
+
+    <div>
+      <input type="range" id="humans" name="humans" min="0" value="1" max="4" oninput="on_humans_change(parseInt(this.value))" onchange="on_humans_change(parseInt(this.value))">
+      <datalist id="tickmarks">
+        <option value="0" label="0">
+        <option value="1" label="1">
+        <option value="2" label="2">
+        <option value="3" label="3">
+        <option value="4" label="4">
+      </datalist>
+      <label id="humans_label" for="humans">Number of human players: 1</label>
+    </div>
+
+    <div>
+      <input type="range" id="cpus" name="cpus" min="0" value="1" max="4" oninput="on_cpus_change(parseInt(this.value))" onchange="on_cpus_change(parseInt(this.value))">
+      <datalist id="tickmarks">
+        <option value="0" label="0">
+        <option value="1" label="1">
+        <option value="2" label="2">
+        <option value="3" label="3">
+        <option value="4" label="4">
+      </datalist>
+      <label id="cpus_label" for="cpus">Number of AI players:1 </label>
+    </div>
 
     <br/>
     <br/>

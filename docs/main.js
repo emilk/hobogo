@@ -23,55 +23,96 @@ function board_to_wasm(board) {
     return wasm_board;
 }
 function ai_move(board, player) {
-    return wasm_bindgen.ai_move(board_to_wasm(board), player_to_wasm(player));
+    return wasm_bindgen.ai_move(board_to_wasm(board), player_to_wasm(player), num_players());
 }
-function game_over(board, num_players) {
-    return wasm_bindgen.game_over(board_to_wasm(board), num_players);
+function game_over(board) {
+    return wasm_bindgen.game_over(board_to_wasm(board), num_players());
 }
 // ----------------------------------------------------------------------------
 function player_name(player) {
+    var name;
     if (player === 0) {
-        return "red ";
+        name = "blue  ";
     }
     else if (player === 1) {
-        return "blue";
+        name = "red   ";
+    }
+    else if (player === 2) {
+        name = "green ";
+    }
+    else if (player === 3) {
+        name = "yellow";
     }
     else {
-        return "p" + player;
+        name = "p" + player + "    ";
     }
+    if (player < g_num_humans) {
+        name += " (human)";
+    }
+    else {
+        name += " (AI)   ";
+    }
+    return name;
 }
 function player_color(player) {
     if (player === null) {
         return "#AAAAAA";
     }
-    else if (player === 0) {
-        return "#FF2222";
+    if (player === 0) {
+        return "#6666FF";
+    }
+    else if (player === 1) {
+        return "#FF0000";
+    }
+    else if (player === 2) {
+        return "#00FF00";
     }
     else {
-        return "#3366FF";
+        return "#DDDD00";
     }
+}
+// blendColors from https://stackoverflow.com/a/13542669
+function blend_hex_colors(c0, c1, p) {
+    var f = parseInt(c0.slice(1), 16);
+    var t = parseInt(c1.slice(1), 16);
+    var R1 = f >> 16;
+    var G1 = f >> 8 & 0x00FF;
+    var B1 = f & 0x0000FF;
+    var R2 = t >> 16;
+    var G2 = t >> 8 & 0x00FF;
+    var B2 = t & 0x0000FF;
+    return "#" + (0x1000000 + (Math.round((R2 - R1) * p) + R1) * 0x10000 +
+        (Math.round((G2 - G1) * p) + G1) * 0x100 +
+        (Math.round((B2 - B1) * p) + B1)).toString(16).slice(1);
 }
 function cell_color(board, coord) {
     var owner = board_at(board, coord);
     if (owner !== null) {
         return player_color(owner);
     }
-    // if (is_hovering && is_valid_move(board, coord, g_current_player)) {
-    //   // TODO: proper preview
-    //   return player_color(g_current_player);
-    // }
-    if (is_valid_move(board, coord, g_current_player)) {
-        return "#777";
-    }
     var ruler = ruled_by(board, coord);
-    if (ruler === null) {
-        // We may not currently play here, but we might in the future!
-        return "#444";
+    if (ruler !== null) {
+        return blend_hex_colors("#333333", player_color(ruler), 0.2);
     }
-    else {
-        // We will never be able to play here:
-        return "#222";
+    var claimer = claimed_by(board, coord);
+    if (claimer !== null) {
+        return blend_hex_colors("#555555", player_color(claimer), 0.2);
     }
+    var is_ai = g_current_player >= g_num_humans;
+    if (!is_ai && !is_valid_move(board, coord, g_current_player)) {
+        // The current human can´t move here.
+        return "#555555";
+    }
+    return "#888888"; // Free (at least for some).
+    // const is_ai = g_current_player >= g_num_humans;
+    // if (is_ai || is_valid_move(board, coord, g_current_player)) {
+    //   return "#777";
+    // }
+    // if (ruled_by(board, coord) !== null) {
+    //   return "#222"; // Locked in, can´t change color. TODO: TINT?
+    // }
+    // // We may not currently play here, but we might in the future!
+    // return "#444";
 }
 var g_cell_size = 48;
 function hovered_cell(board, mouse_pos) {
@@ -91,10 +132,22 @@ function hovered_cell(board, mouse_pos) {
     }
     return null;
 }
-var PAINT_INFLUENCE = true;
+var PAINT_INFLUENCE = false;
+function column_name(x) {
+    return String.fromCharCode(x + 65);
+}
+function row_name(y) {
+    return "" + (y + 1);
+}
+// Chess name:
+function coord_name(coord) {
+    return "" + column_name(coord.x) + row_name(coord.y);
+}
 function paint_board(canvas, board, hovered) {
     var FONT = "monospace";
-    board = make_move(board, hovered, g_current_player) || board; // PREVIEW!
+    if (hovered !== null) {
+        board = make_move(board, hovered, g_current_player) || board; // PREVIEW!
+    }
     var context = canvas.getContext("2d");
     context.fillStyle = "#111111";
     context.clearRect(0, 0, canvas.width, canvas.height);
@@ -109,7 +162,7 @@ function paint_board(canvas, board, hovered) {
             context.fillRect(left, top_2, right - left, bottom - top_2);
             if (board[y][x] === null && PAINT_INFLUENCE) {
                 var influences = influences_at(board, { x: x, y: y });
-                if (g_num_players === 2) {
+                if (num_players() === 2) {
                     if (influences[0] !== influences[1]) {
                         var font_size = 10;
                         context.font = font_size + "pt " + FONT;
@@ -121,10 +174,10 @@ function paint_board(canvas, board, hovered) {
                     }
                 }
                 else {
-                    for (var pi = 0; pi < g_num_players; ++pi) {
+                    for (var pi = 0; pi < num_players(); ++pi) {
                         for (var i = 0; i < influences[pi]; ++i) {
                             var cx = left + g_cell_size * (1 + i) / 5;
-                            var cy = top_2 + g_cell_size * (1 + pi) / (g_num_players + 1);
+                            var cy = top_2 + g_cell_size * (1 + pi) / (num_players() + 1);
                             var radius = 4;
                             context.beginPath();
                             context.arc(cx, cy, radius, 0, 2 * Math.PI, false);
@@ -140,18 +193,18 @@ function paint_board(canvas, board, hovered) {
     for (var x = 0; x < board[0].length; ++x) {
         context.font = "12pt " + FONT;
         context.fillStyle = "white";
-        context.fillText("" + String.fromCharCode(x + 65), (x + 0.5) * g_cell_size - 6, board.length * g_cell_size + 12);
+        context.fillText("" + column_name(x), (x + 0.5) * g_cell_size - 6, board.length * g_cell_size + 12);
     }
     // Rows: 1, 2, 3, ...
     for (var y = 0; y < board[0].length; ++y) {
         context.font = "12pt " + FONT;
         context.fillStyle = "white";
-        context.fillText("" + (y + 1), board[0].length * g_cell_size + 12, (y + 0.5) * g_cell_size);
+        context.fillText("" + row_name(y), board[0].length * g_cell_size + 12, (y + 0.5) * g_cell_size);
     }
     {
         var y = board.length * g_cell_size + 64;
         context.font = "12pt " + FONT;
-        if (game_over(board, g_num_players)) {
+        if (game_over(board)) {
             context.fillStyle = "white";
             context.fillText("GAME OVER", 12, y);
         }
@@ -165,7 +218,7 @@ function paint_board(canvas, board, hovered) {
         context.fillText("Score:", 12, y);
         y += 16;
         var score = get_score(board);
-        for (var pi = 0; pi < g_num_players; ++pi) {
+        for (var pi = 0; pi < num_players(); ++pi) {
             context.fillStyle = player_color(pi);
             context.fillText(player_name(pi) + ": " + score.certain[pi] + " (+ " + score.claimed[pi] + " claimed)", 12, y);
             y += 16;
@@ -182,7 +235,6 @@ function get_mouse_pos(canvas, evt) {
     };
 }
 var g_canvas = document.getElementById("hobo_canvas");
-var g_num_players = 2;
 function array(n, value_maker) {
     var board = [];
     for (var i = 0; i < n; ++i) {
@@ -221,7 +273,7 @@ function num_neighbors(board, coord) {
     return num;
 }
 function influences_at(board, coord) {
-    var influences = array(g_num_players, function (_) { return 0; });
+    var influences = array(num_players(), function (_) { return 0; });
     for (var dy = -1; dy <= +1; ++dy) {
         for (var dx = -1; dx <= +1; ++dx) {
             if (dx === 0 && dy === 0) {
@@ -242,7 +294,7 @@ function ruled_by(board, coord) {
         return board[coord.y][coord.x];
     }
     var influences = influences_at(board, coord);
-    for (var pi = 0; pi < g_num_players; ++pi) {
+    for (var pi = 0; pi < num_players(); ++pi) {
         if (influences[pi] > num_neighbors(board, coord) / 2) {
             // Player WILL win this, no matter what.
             return pi;
@@ -256,9 +308,9 @@ function claimed_by(board, coord) {
         return board[coord.y][coord.x];
     }
     var influences = influences_at(board, coord);
-    for (var player = 0; player < g_num_players; ++player) {
+    for (var player = 0; player < num_players(); ++player) {
         var somebody_else_is_as_large = false;
-        for (var other = 0; other < g_num_players; ++other) {
+        for (var other = 0; other < num_players(); ++other) {
             if (player !== other && influences[other] >= influences[player]) {
                 somebody_else_is_as_large = true;
             }
@@ -271,8 +323,8 @@ function claimed_by(board, coord) {
 }
 function get_score(board) {
     var score = {
-        certain: array(g_num_players, function (_) { return 0; }),
-        claimed: array(g_num_players, function (_) { return 0; }),
+        certain: array(num_players(), function (_) { return 0; }),
+        claimed: array(num_players(), function (_) { return 0; }),
         parities: 0
     };
     for (var y = 0; y < board.length; ++y) {
@@ -317,7 +369,7 @@ function is_valid_move(board, coord, player) {
         return false;
     }
     var influences = influences_at(board, coord);
-    for (var i = 0; i < g_num_players; ++i) {
+    for (var i = 0; i < num_players(); ++i) {
         if (influences[i] > influences[player]) {
             return false;
         }
@@ -328,18 +380,28 @@ function clone(obj) {
     return JSON.parse(JSON.stringify(obj));
 }
 function make_move(board, coord, player) {
+    var is_pass = (coord.x === -1 && coord.y === -1);
+    if (is_pass) {
+        return clone(board);
+    }
     if (!is_valid_move(board, coord, player)) {
         return null;
     }
     board = clone(board);
     board[coord.y][coord.x] = player;
-    if (game_over(board, g_num_players)) {
+    if (game_over(board)) {
         board = fill_in(board);
     }
     return board;
 }
-var g_board = make_board(7);
+var g_board_size = 7;
+var g_board = make_board(g_board_size);
 var g_current_player = 0;
+var g_num_humans = 1;
+var g_num_cpus = 1;
+function num_players() {
+    return g_num_humans + g_num_cpus;
+}
 function start_game() {
     g_canvas.addEventListener("mousemove", function (evt) {
         var mouse_pos = get_mouse_pos(g_canvas, evt);
@@ -350,10 +412,6 @@ function start_game() {
         var mouse_pos = get_mouse_pos(g_canvas, evt);
         var hovered = hovered_cell(g_board, mouse_pos);
         try_make_move(hovered);
-        if (g_current_player === 1) {
-            make_ai_move();
-        }
-        paint_board(g_canvas, g_board, hovered);
     }, false);
     paint_board(g_canvas, g_board, null);
 }
@@ -361,12 +419,45 @@ function try_make_move(coord) {
     var new_board = make_move(g_board, coord, g_current_player);
     if (new_board) {
         g_board = new_board;
-        g_current_player = (g_current_player + 1) % g_num_players;
+        g_current_player = (g_current_player + 1) % num_players();
+        paint_board(g_canvas, g_board, null);
+        if (g_current_player >= g_num_humans) {
+            setTimeout(make_ai_move, 100);
+        }
+    }
+    else {
+        console.error("Cannot make move at " + coord_name(coord) + " for player " + player_name(g_current_player));
     }
 }
-export function make_ai_move() {
+function make_ai_move() {
     var coord = ai_move(g_board, g_current_player);
+    console.info("AI " + player_name(g_current_player) + ": " + coord_name(coord));
     try_make_move(coord);
     paint_board(g_canvas, g_board, null);
 }
-window.make_ai_move = make_ai_move; // HACK
+export function on_size_change(size) {
+    g_board_size = size;
+    document.getElementById("size_label").innerHTML = "Size: " + size + "x" + size;
+    new_game();
+}
+export function on_humans_change(humans) {
+    document.getElementById("humans_label").innerHTML = "Number of human players: " + humans;
+    g_num_humans = humans;
+}
+export function on_cpus_change(cpus) {
+    document.getElementById("cpus_label").innerHTML = "Number of AI players: " + cpus;
+    g_num_cpus = cpus;
+}
+export function new_game() {
+    console.log("Starting new " + g_board_size + "x" + g_board_size + " game with " + g_num_humans + " and  " + g_num_cpus + " cpus.");
+    g_board = make_board(g_board_size);
+    g_current_player = 0;
+    paint_board(g_canvas, g_board, null);
+    if (g_num_humans === 0) {
+        make_ai_move();
+    }
+}
+document.on_size_change = on_size_change; // HACK
+document.on_humans_change = on_humans_change; // HACK
+document.on_cpus_change = on_cpus_change; // HACK
+document.new_game = new_game; // HACK

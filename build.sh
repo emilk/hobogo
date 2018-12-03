@@ -7,18 +7,19 @@ if ! [[ $(wasm-bindgen --version) ]]; then
     cargo install wasm-bindgen-cli
 fi
 
-BUILD=release
+BUILD=debug
+# BUILD=release
 
-# Build rust:
-cargo build --$BUILD --target wasm32-unknown-unknown
+echo "Build rust:"
+cargo build --target wasm32-unknown-unknown
 
-# Lint and clean up typescript:
+echo "Lint and clean up typescript:"
 tslint --fix docs/*.ts
 
-# Compile typescript:
+echo "Compile typescript:"
 tsc
 
-# Generate JS bindings for wasm:
+echo "Generate JS bindings for wasm:"
 wasm-bindgen target/wasm32-unknown-unknown/"$BUILD"/hobogo.wasm \
   --out-dir docs --no-modules
   # --no-modules-global hoboho

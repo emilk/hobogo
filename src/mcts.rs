@@ -8,8 +8,20 @@ use hobogo::{Board, Coord, Influence, Player};
 // ----------------------------------------------------------------------------
 
 // TODO: traitify
-// NOTE: if a player wants to pass (in a game where that is allowed), then that is an action.
-type Action = Coord;
+#[derive(Clone, Copy, Debug)]
+pub enum Action {
+    Pass,
+    Move(Coord),
+}
+
+impl fmt::Display for Action {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Action::Pass => f.write_str("PASS"),
+            Action::Move(coord) => coord.fmt(f),
+        }
+    }
+}
 
 // TODO: traitify
 #[derive(Clone)]
@@ -25,11 +37,24 @@ pub struct GameState {
 pub type Score = Vec<f64>;
 
 impl GameState {
-    fn available_actions_for(&self, player: Player) -> Vec<Action> {
+    fn available_moves_for(&self, player: Player) -> Vec<Coord> {
         self.board
             .coords()
-            .filter(|c| self.board.is_valid_move(*c, player))
+            .filter(|c| self.board.is_valid_move(*c, player, self.num_players))
             .collect()
+    }
+
+    fn available_actions_for(&self, player: Player) -> Vec<Action> {
+        let available_moves = self.available_moves_for(player);
+        if available_moves.is_empty() {
+            if self.board.game_over(self.num_players) {
+                vec![]
+            } else {
+                vec![Action::Pass]
+            }
+        } else {
+            available_moves.into_iter().map(Action::Move).collect()
+        }
     }
 
     fn available_actions(&self) -> Vec<Action> {
@@ -42,19 +67,28 @@ impl GameState {
             self.available_actions().choose(rng).cloned()
         } else {
             // Faster
-            let mut coords: Vec<Action> = self.board.coords().collect();
+            let mut coords: Vec<Coord> = self.board.coords().collect();
             coords.shuffle(rng);
             for coord in coords {
-                if self.board.is_valid_move(coord, self.next_player) {
-                    return Some(coord);
+                if self
+                    .board
+                    .is_valid_move(coord, self.next_player, self.num_players)
+                {
+                    return Some(Action::Move(coord));
                 }
             }
-            None
+            if self.board.game_over(self.num_players) {
+                None
+            } else {
+                Some(Action::Pass)
+            }
         }
     }
 
     fn take_action(&mut self, action: &Action) {
-        self.board.set(*action, self.next_player);
+        if let Action::Move(coord) = action {
+            self.board.set(*coord, self.next_player);
+        }
         self.next_player = (self.next_player + 1) % (self.num_players as u8);
     }
 
@@ -86,21 +120,21 @@ impl GameState {
         }
     }
 
-    fn next_action_from_deque(
+    fn next_move_from_deque(
         &self,
-        actions: &mut VecDeque<Action>,
+        moves: &mut VecDeque<Coord>,
         active_player: Player,
-    ) -> Option<Action> {
-        for _ in 0..actions.len() {
-            let action = actions.pop_front().unwrap();
-            match self.board.influence(action) {
+    ) -> Option<Coord> {
+        for _ in 0..moves.len() {
+            let coord = moves.pop_front().unwrap();
+            match self.board.influence(coord) {
                 Influence::Occupied(_) => {}
                 Influence::Ruled(ruler) if ruler != active_player => {}
                 Influence::Claimed(claimer) if claimer != active_player => {
-                    actions.push_back(action); // Try again later
+                    moves.push_back(coord); // Try again later
                 }
                 _ => {
-                    return Some(action);
+                    return Some(coord);
                 }
             };
         }
@@ -115,26 +149,32 @@ impl GameState {
         } else {
             // Almost twice as fast as the one above.
 
-            // Keep a list of available actions for each player:
-            let mut player_actions: Vec<Vec<Action>> = (0..self.num_players)
-                .map(|p| self.available_actions_for(p as Player))
+            let all_moves: Vec<_> = self
+                .board
+                .coords()
+                .filter(|c| !self.board.influence(*c).is_occupied())
                 .collect();
+
+            // Keep a list of available moves for each player:
+            let mut player_moves = vec![all_moves; self.num_players];
             for player in 0..self.num_players {
-                player_actions[player].shuffle(rng);
+                player_moves[player].shuffle(rng);
             }
-            let mut player_actions: Vec<VecDeque<Action>> = player_actions
+
+            let mut player_moves: Vec<VecDeque<Coord>> = player_moves
                 .into_iter()
                 .map(|v| v.into_iter().collect())
                 .collect();
 
             loop {
                 let next_player = self.next_player;
-                let action_list = &mut player_actions[next_player as usize];
-                // if let Some(action) = self.next_action_from_vec(action_list, next_player) {
-                if let Some(action) = self.next_action_from_deque(action_list, next_player) {
-                    self.take_action(&action);
-                } else {
+                let moves = &mut player_moves[next_player as usize];
+                if let Some(coord) = self.next_move_from_deque(moves, next_player) {
+                    self.take_action(&Action::Move(coord));
+                } else if self.board.game_over(self.num_players) {
                     break;
+                } else {
+                    self.take_action(&Action::Pass);
                 }
             }
         }
@@ -215,7 +255,10 @@ impl Node {
     // Recursively play, returns the winner.
     fn iterate<R: Rng>(&mut self, rng: &mut R, mut state: GameState) -> Score {
         // Which player the current node is trying to win for:
-        let optimizing_player = 1 - state.next_player; // TODO: fix this uglyness.
+        // TODO: fix this uglyness:
+        let previous_player =
+            ((state.next_player as usize + state.num_players - 1) % state.num_players) as u8;
+        let optimizing_player = previous_player;
 
         let score = if self.num == 0 {
             state.random_playout(rng);
@@ -261,7 +304,7 @@ impl fmt::Display for Node {
                 (node.score_sum as f64) / (node.num as f64),
                 node.num
             )?;
-            if indent_level > 1 {
+            if indent_level >= 1 {
                 return Ok(());
             }
             if let Some(children) = &node.children {
