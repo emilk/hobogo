@@ -67,7 +67,7 @@ function player_color(player) {
   }
 
   if (player === 0) {
-    return "#6666FF";
+    return "#5577FF";
   } else if (player === 1) {
     return "#FF0000";
   } else if (player === 2) {
@@ -100,46 +100,36 @@ function cell_color(board, coord) {
 
   const ruler = ruled_by(board, coord);
   if (ruler !== null) {
-    return blend_hex_colors("#333333", player_color(ruler), 0.2);
+    return blend_hex_colors("#333333", player_color(ruler), 0.3);
   }
 
   const claimer = claimed_by(board, coord);
   if (claimer !== null) {
-    return blend_hex_colors("#555555", player_color(claimer), 0.2);
+    return blend_hex_colors("#666666", player_color(claimer), 0.3);
   }
 
   const is_ai = g_current_player >= g_num_humans;
   if (!is_ai && !is_valid_move(board, coord, g_current_player)) {
     // The current human can´t move here.
-    return "#555555";
+    return "#666666";
   }
 
-  return "#888888"; // Free (at least for some).
-
-  // const is_ai = g_current_player >= g_num_humans;
-
-  // if (is_ai || is_valid_move(board, coord, g_current_player)) {
-  //   return "#777";
-  // }
-
-  // if (ruled_by(board, coord) !== null) {
-  //   return "#222"; // Locked in, can´t change color. TODO: TINT?
-  // }
-
-  // // We may not currently play here, but we might in the future!
-  // return "#444";
+  return "#999999"; // Free (at least for some).
 }
 
-const g_cell_size = 48;
+function calc_cell_size(board) {
+  return 440 / board.length;
+}
 
 function hovered_cell(board, mouse_pos) {
+  const cell_size = calc_cell_size(board);
   for (let y = 0; y < board.length; ++y) {
     for (let x = 0; x < board[y].length; ++x) {
       const pad = 2;
-      const left = x * g_cell_size + pad;
-      const top = y * g_cell_size + pad;
-      const right = (x + 1) * g_cell_size - pad;
-      const bottom = (y + 1) * g_cell_size - pad;
+      const left = x * cell_size + pad;
+      const top = y * cell_size + pad;
+      const right = (x + 1) * cell_size - pad;
+      const bottom = (y + 1) * cell_size - pad;
       const is_hovering =
         left <= mouse_pos.x && mouse_pos.x <= right &&
         top <= mouse_pos.y && mouse_pos.y <= bottom;
@@ -166,6 +156,22 @@ function coord_name(coord): string {
   return `${column_name(coord.x)}${row_name(coord.y)}`;
 }
 
+// From https://stackoverflow.com/questions/1255512/how-to-draw-a-rounded-rectangle-on-html-canvas
+function rounded_rect(ctx, x: number, y: number, width: number, height: number, radius: number) {
+  ctx.beginPath();
+  ctx.moveTo(x + radius, y);
+  ctx.lineTo(x + width - radius, y);
+  ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+  ctx.lineTo(x + width, y + height - radius);
+  ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+  ctx.lineTo(x + radius, y + height);
+  ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+  ctx.lineTo(x, y + radius);
+  ctx.quadraticCurveTo(x, y, x + radius, y);
+  ctx.closePath();
+  return ctx;
+}
+
 function paint_board(canvas, board, hovered) {
   const FONT = "monospace";
 
@@ -177,16 +183,21 @@ function paint_board(canvas, board, hovered) {
   context.fillStyle = "#111111";
   context.clearRect(0, 0, canvas.width, canvas.height);
 
+  const cell_size = calc_cell_size(board);
+
   for (let y = 0; y < board.length; ++y) {
     for (let x = 0; x < board[y].length; ++x) {
-      const pad = 2;
-      const left = x * g_cell_size + pad;
-      const top = y * g_cell_size + pad;
-      const right = (x + 1) * g_cell_size - pad;
-      const bottom = (y + 1) * g_cell_size - pad;
+      const center_x = (x + 0.5) * cell_size;
+      const center_y = (y + 0.5) * cell_size;
+
+      const hw = 0.5 * cell_size * (board_at(board, {x, y}) === null ? 0.7 : 0.85);
+      const left = center_x - hw;
+      const top = center_y - hw;
+      const right = center_x + hw;
+      const bottom = center_y + hw;
 
       context.fillStyle = cell_color(board, {x, y});
-      context.fillRect(left, top, right - left, bottom - top);
+      rounded_rect(context, left, top, 2 * hw, 2 * hw, 0.45 * hw).fill();
 
       if (board[y][x] === null && PAINT_INFLUENCE) {
         const influences = influences_at(board, {x, y});
@@ -204,8 +215,8 @@ function paint_board(canvas, board, hovered) {
         } else {
           for (let pi = 0; pi < num_players(); ++pi) {
             for (let i = 0; i < influences[pi]; ++i) {
-              const cx = left + g_cell_size * (1 + i) / 5;
-              const cy = top + g_cell_size * (1 + pi) / (num_players() + 1);
+              const cx = left + cell_size * (1 + i) / 5;
+              const cy = top + cell_size * (1 + pi) / (num_players() + 1);
 
               const radius = 4;
               context.beginPath();
@@ -223,18 +234,18 @@ function paint_board(canvas, board, hovered) {
   for (let x = 0; x < board[0].length; ++x) {
     context.font = `12pt ${FONT}`;
     context.fillStyle = "white";
-    context.fillText(`${column_name(x)}`, (x + 0.5) * g_cell_size - 6, board.length * g_cell_size + 12);
+    context.fillText(`${column_name(x)}`, (x + 0.5) * cell_size - 6, board.length * cell_size + 12);
   }
 
   // Rows: 1, 2, 3, ...
   for (let y = 0; y < board[0].length; ++y) {
     context.font = `12pt ${FONT}`;
     context.fillStyle = "white";
-    context.fillText(`${row_name(y)}`, board[0].length * g_cell_size + 12, (y + 0.5) * g_cell_size);
+    context.fillText(`${row_name(y)}`, board[0].length * cell_size + 12, (y + 0.5) * cell_size + 6);
   }
 
   {
-    let y = board.length * g_cell_size + 64;
+    let y = board.length * cell_size + 64;
     context.font = `12pt ${FONT}`;
     if (game_over(board)) {
       context.fillStyle = "white";

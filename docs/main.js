@@ -59,7 +59,7 @@ function player_color(player) {
         return "#AAAAAA";
     }
     if (player === 0) {
-        return "#6666FF";
+        return "#5577FF";
     }
     else if (player === 1) {
         return "#FF0000";
@@ -92,37 +92,31 @@ function cell_color(board, coord) {
     }
     var ruler = ruled_by(board, coord);
     if (ruler !== null) {
-        return blend_hex_colors("#333333", player_color(ruler), 0.2);
+        return blend_hex_colors("#333333", player_color(ruler), 0.3);
     }
     var claimer = claimed_by(board, coord);
     if (claimer !== null) {
-        return blend_hex_colors("#555555", player_color(claimer), 0.2);
+        return blend_hex_colors("#666666", player_color(claimer), 0.3);
     }
     var is_ai = g_current_player >= g_num_humans;
     if (!is_ai && !is_valid_move(board, coord, g_current_player)) {
         // The current human can´t move here.
-        return "#555555";
+        return "#666666";
     }
-    return "#888888"; // Free (at least for some).
-    // const is_ai = g_current_player >= g_num_humans;
-    // if (is_ai || is_valid_move(board, coord, g_current_player)) {
-    //   return "#777";
-    // }
-    // if (ruled_by(board, coord) !== null) {
-    //   return "#222"; // Locked in, can´t change color. TODO: TINT?
-    // }
-    // // We may not currently play here, but we might in the future!
-    // return "#444";
+    return "#999999"; // Free (at least for some).
 }
-var g_cell_size = 48;
+function calc_cell_size(board) {
+    return 440 / board.length;
+}
 function hovered_cell(board, mouse_pos) {
+    var cell_size = calc_cell_size(board);
     for (var y = 0; y < board.length; ++y) {
         for (var x = 0; x < board[y].length; ++x) {
             var pad = 2;
-            var left = x * g_cell_size + pad;
-            var top_1 = y * g_cell_size + pad;
-            var right = (x + 1) * g_cell_size - pad;
-            var bottom = (y + 1) * g_cell_size - pad;
+            var left = x * cell_size + pad;
+            var top_1 = y * cell_size + pad;
+            var right = (x + 1) * cell_size - pad;
+            var bottom = (y + 1) * cell_size - pad;
             var is_hovering = left <= mouse_pos.x && mouse_pos.x <= right &&
                 top_1 <= mouse_pos.y && mouse_pos.y <= bottom;
             if (is_hovering) {
@@ -143,6 +137,21 @@ function row_name(y) {
 function coord_name(coord) {
     return "" + column_name(coord.x) + row_name(coord.y);
 }
+// From https://stackoverflow.com/questions/1255512/how-to-draw-a-rounded-rectangle-on-html-canvas
+function rounded_rect(ctx, x, y, width, height, radius) {
+    ctx.beginPath();
+    ctx.moveTo(x + radius, y);
+    ctx.lineTo(x + width - radius, y);
+    ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+    ctx.lineTo(x + width, y + height - radius);
+    ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+    ctx.lineTo(x + radius, y + height);
+    ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+    ctx.lineTo(x, y + radius);
+    ctx.quadraticCurveTo(x, y, x + radius, y);
+    ctx.closePath();
+    return ctx;
+}
 function paint_board(canvas, board, hovered) {
     var FONT = "monospace";
     if (hovered !== null) {
@@ -151,15 +160,18 @@ function paint_board(canvas, board, hovered) {
     var context = canvas.getContext("2d");
     context.fillStyle = "#111111";
     context.clearRect(0, 0, canvas.width, canvas.height);
+    var cell_size = calc_cell_size(board);
     for (var y = 0; y < board.length; ++y) {
         for (var x = 0; x < board[y].length; ++x) {
-            var pad = 2;
-            var left = x * g_cell_size + pad;
-            var top_2 = y * g_cell_size + pad;
-            var right = (x + 1) * g_cell_size - pad;
-            var bottom = (y + 1) * g_cell_size - pad;
+            var center_x = (x + 0.5) * cell_size;
+            var center_y = (y + 0.5) * cell_size;
+            var hw = 0.5 * cell_size * (board_at(board, { x: x, y: y }) === null ? 0.7 : 0.85);
+            var left = center_x - hw;
+            var top_2 = center_y - hw;
+            var right = center_x + hw;
+            var bottom = center_y + hw;
             context.fillStyle = cell_color(board, { x: x, y: y });
-            context.fillRect(left, top_2, right - left, bottom - top_2);
+            rounded_rect(context, left, top_2, 2 * hw, 2 * hw, 0.45 * hw).fill();
             if (board[y][x] === null && PAINT_INFLUENCE) {
                 var influences = influences_at(board, { x: x, y: y });
                 if (num_players() === 2) {
@@ -176,8 +188,8 @@ function paint_board(canvas, board, hovered) {
                 else {
                     for (var pi = 0; pi < num_players(); ++pi) {
                         for (var i = 0; i < influences[pi]; ++i) {
-                            var cx = left + g_cell_size * (1 + i) / 5;
-                            var cy = top_2 + g_cell_size * (1 + pi) / (num_players() + 1);
+                            var cx = left + cell_size * (1 + i) / 5;
+                            var cy = top_2 + cell_size * (1 + pi) / (num_players() + 1);
                             var radius = 4;
                             context.beginPath();
                             context.arc(cx, cy, radius, 0, 2 * Math.PI, false);
@@ -193,16 +205,16 @@ function paint_board(canvas, board, hovered) {
     for (var x = 0; x < board[0].length; ++x) {
         context.font = "12pt " + FONT;
         context.fillStyle = "white";
-        context.fillText("" + column_name(x), (x + 0.5) * g_cell_size - 6, board.length * g_cell_size + 12);
+        context.fillText("" + column_name(x), (x + 0.5) * cell_size - 6, board.length * cell_size + 12);
     }
     // Rows: 1, 2, 3, ...
     for (var y = 0; y < board[0].length; ++y) {
         context.font = "12pt " + FONT;
         context.fillStyle = "white";
-        context.fillText("" + row_name(y), board[0].length * g_cell_size + 12, (y + 0.5) * g_cell_size);
+        context.fillText("" + row_name(y), board[0].length * cell_size + 12, (y + 0.5) * cell_size + 6);
     }
     {
-        var y = board.length * g_cell_size + 64;
+        var y = board.length * cell_size + 64;
         context.font = "12pt " + FONT;
         if (game_over(board)) {
             context.fillStyle = "white";
