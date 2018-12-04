@@ -11,6 +11,7 @@
         margin: auto;
       }
     </style>
+    <link rel="stylesheet" type="text/css" href="slider.css">
   </head>
   <body>
     <script>
@@ -49,12 +50,12 @@
 
     <div>
       <input type="range" id="humans" name="humans" min="0" value="1" max="4" oninput="on_humans_change(parseInt(this.value))" onchange="on_humans_change(parseInt(this.value))">
-      <label id="humans_label" for="humans">Number of human players: 1</label>
+      <label id="humans_label" for="humans">Humans: 1</label>
     </div>
 
     <div>
       <input type="range" id="cpus" name="cpus" min="0" value="1" max="4" oninput="on_cpus_change(parseInt(this.value))" onchange="on_cpus_change(parseInt(this.value))">
-      <label id="cpus_label" for="cpus">Number of AI players:1 </label>
+      <label id="cpus_label" for="cpus">Bots: 1 </label>
     </div>
 
     <br/>
