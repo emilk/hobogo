@@ -53,9 +53,9 @@ function player_name(player: number): string {
   }
 
   if (player < g_num_humans) {
-    name += " (human)";
+    name += "     ";
   } else {
-    name += " (AI)   ";
+    name += " (AI)";
   }
 
   return name;
@@ -258,17 +258,16 @@ function paint_board(canvas, board, hovered) {
     y += 16;
 
     context.fillStyle = "white";
-    context.fillText(`Score:`, 12, y);
+    context.fillText(`Current standing:`, 12, y);
     y += 16;
 
     const score = get_score(board);
     for (let pi = 0; pi < num_players(); ++pi) {
       context.fillStyle = player_color(pi);
-      context.fillText(`${player_name(pi)}: ${score.certain[pi]} (+ ${score.claimed[pi]} claimed)`, 12, y);
+      context.fillText(`${player_name(pi)}: ${score.certain[pi] + score.claimed[pi]}`, 12, y);
       y += 16;
     }
     context.fillStyle = "white";
-    context.fillText(`parities: ${score.parities}`, 12, y);
   }
 }
 
