@@ -10,7 +10,7 @@ input[type=range]:focus {
 }
 input[type=range]::-webkit-slider-runnable-track {
   width: 60%;
-  height: 8.4px;
+  height: 14px;
   cursor: pointer;
   animate: 0.2s;
   box-shadow: 1px 1px 1px #000000, 0px 0px 1px #0d0d0d;
@@ -22,7 +22,7 @@ input[type=range]::-webkit-slider-thumb {
   box-shadow: 1px 1px 1px #000000, 0px 0px 1px #0d0d0d;
   border: 1px solid #000000;
   height: 32px;
-  width: 16px;
+  width: 32px;
   border-radius: 3px;
   background: #ffffff;
   cursor: pointer;
@@ -33,8 +33,8 @@ input[type=range]:focus::-webkit-slider-runnable-track {
   background: #367ebd;
 }
 input[type=range]::-moz-range-track {
-  width: 60%;
-  height: 8.4px;
+  width: 100%;
+  height: 14px;
   cursor: pointer;
   animate: 0.2s;
   box-shadow: 1px 1px 1px #000000, 0px 0px 1px #0d0d0d;
@@ -46,14 +46,14 @@ input[type=range]::-moz-range-thumb {
   box-shadow: 1px 1px 1px #000000, 0px 0px 1px #0d0d0d;
   border: 1px solid #000000;
   height: 32px;
-  width: 16px;
+  width: 32px;
   border-radius: 3px;
   background: #ffffff;
   cursor: pointer;
 }
 input[type=range]::-ms-track {
-  width: 60%;
-  height: 8.4px;
+  width: 100%;
+  height: 14px;
   cursor: pointer;
   animate: 0.2s;
   background: transparent;

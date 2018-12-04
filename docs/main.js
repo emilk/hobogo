@@ -452,11 +452,11 @@ export function on_size_change(size) {
     new_game();
 }
 export function on_humans_change(humans) {
-    document.getElementById("humans_label").innerHTML = "Number of human players: " + humans;
+    document.getElementById("humans_label").innerHTML = "Humans: " + humans;
     g_num_humans = humans;
 }
 export function on_cpus_change(cpus) {
-    document.getElementById("cpus_label").innerHTML = "Number of AI players: " + cpus;
+    document.getElementById("cpus_label").innerHTML = "Bots: " + cpus;
     g_num_cpus = cpus;
 }
 export function new_game() {
