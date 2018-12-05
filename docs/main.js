@@ -32,24 +32,21 @@ function game_over(board) {
 function player_name(player) {
     var name;
     if (player === 0) {
-        name = "blue  ";
+        name = "blue";
     }
     else if (player === 1) {
-        name = "red   ";
+        name = "red";
     }
     else if (player === 2) {
-        name = "green ";
+        name = "green";
     }
     else if (player === 3) {
         name = "yellow";
     }
     else {
-        name = "p" + player + "    ";
+        name = "p" + player;
     }
-    if (player < g_num_humans) {
-        name += "     ";
-    }
-    else {
+    if (player >= g_num_humans) {
         name += " (AI)";
     }
     return name;
@@ -153,13 +150,13 @@ function rounded_rect(ctx, x, y, width, height, radius) {
     return ctx;
 }
 function paint_board(canvas, board, hovered) {
-    var FONT = "monospace";
     if (hovered !== null) {
         board = make_move(board, hovered, g_current_player) || board; // PREVIEW!
     }
-    var context = canvas.getContext("2d");
-    context.fillStyle = "#111111";
-    context.clearRect(0, 0, canvas.width, canvas.height);
+    var ctx = canvas.getContext("2d");
+    ctx.font = "20px Palatino";
+    ctx.fillStyle = "#111111";
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
     var cell_size = calc_cell_size(board);
     for (var y = 0; y < board.length; ++y) {
         for (var x = 0; x < board[y].length; ++x) {
@@ -170,19 +167,19 @@ function paint_board(canvas, board, hovered) {
             var top_2 = center_y - hw;
             var right = center_x + hw;
             var bottom = center_y + hw;
-            context.fillStyle = cell_color(board, { x: x, y: y });
-            rounded_rect(context, left, top_2, 2 * hw, 2 * hw, 0.45 * hw).fill();
+            ctx.fillStyle = cell_color(board, { x: x, y: y });
+            rounded_rect(ctx, left, top_2, 2 * hw, 2 * hw, 0.45 * hw).fill();
             if (board[y][x] === null && PAINT_INFLUENCE) {
                 var influences = influences_at(board, { x: x, y: y });
                 if (num_players() === 2) {
                     if (influences[0] !== influences[1]) {
                         var font_size = 10;
-                        context.font = font_size + "pt " + FONT;
+                        ctx.font = font_size + "pt monospace";
                         var player = influences[0] > influences[1] ? 0 : 1;
                         var text = (influences[player] > num_neighbors(board, { x: x, y: y }) / 2) ? "X"
                             : "" + Math.abs(influences[player] - influences[1 - player]);
-                        context.fillStyle = player_color(player);
-                        context.fillText(text, (left + right) / 2 - font_size / 2, (top_2 + bottom) / 2 + font_size / 2);
+                        ctx.fillStyle = player_color(player);
+                        ctx.fillText(text, (left + right) / 2 - font_size / 2, (top_2 + bottom) / 2 + font_size / 2);
                     }
                 }
                 else {
@@ -191,10 +188,10 @@ function paint_board(canvas, board, hovered) {
                             var cx = left + cell_size * (1 + i) / 5;
                             var cy = top_2 + cell_size * (1 + pi) / (num_players() + 1);
                             var radius = 4;
-                            context.beginPath();
-                            context.arc(cx, cy, radius, 0, 2 * Math.PI, false);
-                            context.fillStyle = player_color(pi);
-                            context.fill();
+                            ctx.beginPath();
+                            ctx.arc(cx, cy, radius, 0, 2 * Math.PI, false);
+                            ctx.fillStyle = player_color(pi);
+                            ctx.fill();
                         }
                     }
                 }
@@ -203,39 +200,43 @@ function paint_board(canvas, board, hovered) {
     }
     // Columns: A, B, C, D, ...
     for (var x = 0; x < board[0].length; ++x) {
-        context.font = "12pt " + FONT;
-        context.fillStyle = "white";
-        context.fillText("" + column_name(x), (x + 0.5) * cell_size - 6, board.length * cell_size + 12);
+        ctx.fillStyle = "white";
+        ctx.textAlign = "center";
+        ctx.fillText("" + column_name(x), (x + 0.5) * cell_size, board.length * cell_size + 16);
+        ctx.textAlign = "start";
     }
     // Rows: 1, 2, 3, ...
     for (var y = 0; y < board[0].length; ++y) {
-        context.font = "12pt " + FONT;
-        context.fillStyle = "white";
-        context.fillText("" + row_name(y), board[0].length * cell_size + 12, (y + 0.5) * cell_size + 6);
+        ctx.fillStyle = "white";
+        ctx.textAlign = "center";
+        ctx.fillText("" + row_name(y), board[0].length * cell_size + 12, (y + 0.5) * cell_size + 6);
+        ctx.textAlign = "start";
     }
     {
+        var LINES_SPACING = 32;
         var y = board.length * cell_size + 64;
-        context.font = "12pt " + FONT;
         if (game_over(board)) {
-            context.fillStyle = "white";
-            context.fillText("GAME OVER", 12, y);
+            ctx.fillStyle = "white";
+            ctx.fillText("GAME OVER", 12, y);
         }
         else {
-            context.fillStyle = player_color(g_current_player);
-            context.fillText("Current player: " + player_name(g_current_player), 12, y);
+            ctx.fillStyle = player_color(g_current_player);
+            ctx.fillText(player_name(g_current_player) + " to play", 12, y);
         }
-        y += 16;
-        y += 16;
-        context.fillStyle = "white";
-        context.fillText("Current standing:", 12, y);
-        y += 16;
+        y += 1.5 * LINES_SPACING;
+        ctx.fillStyle = "white";
+        ctx.fillText("Standings:", 12, y);
+        y += LINES_SPACING;
         var score = get_score(board);
         for (var pi = 0; pi < num_players(); ++pi) {
-            context.fillStyle = player_color(pi);
-            context.fillText(player_name(pi) + ": " + (score.certain[pi] + score.claimed[pi]), 12, y);
-            y += 16;
+            ctx.fillStyle = player_color(pi);
+            ctx.fillText("" + player_name(pi), 12, y);
+            ctx.textAlign = "end";
+            ctx.fillText("" + (score.certain[pi] + score.claimed[pi]), 200, y);
+            ctx.textAlign = "start";
+            y += LINES_SPACING;
         }
-        context.fillStyle = "white";
+        ctx.fillStyle = "white";
     }
 }
 function get_mouse_pos(canvas, evt) {

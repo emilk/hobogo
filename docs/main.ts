@@ -41,20 +41,18 @@ function game_over(board) {
 function player_name(player: number): string {
   let name;
   if (player === 0) {
-    name = "blue  ";
+    name = "blue";
   } else if (player === 1) {
-    name = "red   ";
+    name = "red";
   } else if (player === 2) {
-    name = "green ";
+    name = "green";
   } else if (player === 3) {
     name = "yellow";
   } else {
-    name = `p${player}    `;
+    name = `p${player}`;
   }
 
-  if (player < g_num_humans) {
-    name += "     ";
-  } else {
+  if (player >= g_num_humans) {
     name += " (AI)";
   }
 
@@ -173,15 +171,15 @@ function rounded_rect(ctx, x: number, y: number, width: number, height: number, 
 }
 
 function paint_board(canvas, board, hovered) {
-  const FONT = "monospace";
 
   if (hovered !== null) {
     board = make_move(board, hovered, g_current_player) || board; // PREVIEW!
   }
 
-  const context = canvas.getContext("2d");
-  context.fillStyle = "#111111";
-  context.clearRect(0, 0, canvas.width, canvas.height);
+  const ctx = canvas.getContext("2d");
+  ctx.font = "20px Palatino";
+  ctx.fillStyle = "#111111";
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
 
   const cell_size = calc_cell_size(board);
 
@@ -196,21 +194,21 @@ function paint_board(canvas, board, hovered) {
       const right = center_x + hw;
       const bottom = center_y + hw;
 
-      context.fillStyle = cell_color(board, {x, y});
-      rounded_rect(context, left, top, 2 * hw, 2 * hw, 0.45 * hw).fill();
+      ctx.fillStyle = cell_color(board, {x, y});
+      rounded_rect(ctx, left, top, 2 * hw, 2 * hw, 0.45 * hw).fill();
 
       if (board[y][x] === null && PAINT_INFLUENCE) {
         const influences = influences_at(board, {x, y});
         if (num_players() === 2) {
           if (influences[0] !== influences[1]) {
             const font_size = 10;
-            context.font = `${font_size}pt ${FONT}`;
+            ctx.font = `${font_size}pt monospace`;
             const player = influences[0] > influences[1] ? 0 : 1;
             const text =
               (influences[player] > num_neighbors(board, {x, y}) / 2) ? "X"
               : `${Math.abs(influences[player] - influences[1 - player])}`;
-            context.fillStyle = player_color(player);
-            context.fillText(text, (left + right) / 2 - font_size / 2, (top + bottom) / 2 + font_size / 2);
+            ctx.fillStyle = player_color(player);
+            ctx.fillText(text, (left + right) / 2 - font_size / 2, (top + bottom) / 2 + font_size / 2);
           }
         } else {
           for (let pi = 0; pi < num_players(); ++pi) {
@@ -219,10 +217,10 @@ function paint_board(canvas, board, hovered) {
               const cy = top + cell_size * (1 + pi) / (num_players() + 1);
 
               const radius = 4;
-              context.beginPath();
-              context.arc(cx, cy, radius, 0, 2 * Math.PI, false);
-              context.fillStyle = player_color(pi);
-              context.fill();
+              ctx.beginPath();
+              ctx.arc(cx, cy, radius, 0, 2 * Math.PI, false);
+              ctx.fillStyle = player_color(pi);
+              ctx.fill();
             }
           }
         }
@@ -232,42 +230,47 @@ function paint_board(canvas, board, hovered) {
 
   // Columns: A, B, C, D, ...
   for (let x = 0; x < board[0].length; ++x) {
-    context.font = `12pt ${FONT}`;
-    context.fillStyle = "white";
-    context.fillText(`${column_name(x)}`, (x + 0.5) * cell_size - 6, board.length * cell_size + 12);
+    ctx.fillStyle = "white";
+    ctx.textAlign = "center";
+    ctx.fillText(`${column_name(x)}`, (x + 0.5) * cell_size, board.length * cell_size + 16);
+    ctx.textAlign = "start";
   }
 
   // Rows: 1, 2, 3, ...
   for (let y = 0; y < board[0].length; ++y) {
-    context.font = `12pt ${FONT}`;
-    context.fillStyle = "white";
-    context.fillText(`${row_name(y)}`, board[0].length * cell_size + 12, (y + 0.5) * cell_size + 6);
+    ctx.fillStyle = "white";
+    ctx.textAlign = "center";
+    ctx.fillText(`${row_name(y)}`, board[0].length * cell_size + 12, (y + 0.5) * cell_size + 8);
+    ctx.textAlign = "start";
   }
 
   {
-    let y = board.length * cell_size + 64;
-    context.font = `12pt ${FONT}`;
-    if (game_over(board)) {
-      context.fillStyle = "white";
-      context.fillText(`GAME OVER`, 12, y);
-    } else {
-      context.fillStyle = player_color(g_current_player);
-      context.fillText(`Current player: ${player_name(g_current_player)}`, 12, y);
-    }
-    y += 16;
-    y += 16;
+    const LINES_SPACING = 32;
 
-    context.fillStyle = "white";
-    context.fillText(`Current standing:`, 12, y);
-    y += 16;
+    let y = board.length * cell_size + 64;
+    if (game_over(board)) {
+      ctx.fillStyle = "white";
+      ctx.fillText(`GAME OVER`, 12, y);
+    } else {
+      ctx.fillStyle = player_color(g_current_player);
+      ctx.fillText(`${player_name(g_current_player)} to play`, 12, y);
+    }
+    y += 1.5 * LINES_SPACING;
+
+    ctx.fillStyle = "white";
+    ctx.fillText(`Standings:`, 12, y);
+    y += LINES_SPACING;
 
     const score = get_score(board);
     for (let pi = 0; pi < num_players(); ++pi) {
-      context.fillStyle = player_color(pi);
-      context.fillText(`${player_name(pi)}: ${score.certain[pi] + score.claimed[pi]}`, 12, y);
-      y += 16;
+      ctx.fillStyle = player_color(pi);
+      ctx.fillText(`${player_name(pi)}`, 12, y);
+      ctx.textAlign = "end";
+      ctx.fillText(`${score.certain[pi] + score.claimed[pi]}`, 200, y);
+      ctx.textAlign = "start";
+      y += LINES_SPACING;
     }
-    context.fillStyle = "white";
+    ctx.fillStyle = "white";
   }
 }
 

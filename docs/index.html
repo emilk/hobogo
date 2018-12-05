@@ -3,12 +3,26 @@
   <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
   <head>
     <title>Hobogo</title>
+
     <style>
+      html {
+        /* Remove touch delay: */
+        touch-action: manipulation;
+      }
+
       body {
         background: #111111;
         color: #bbbbbb;
         max-width: 480px;
         margin: auto;
+      }
+
+      button {
+        color: #bbbbbb;
+        font-size: 24px;
+        border-radius: 12px;
+        /*background-color: #008CBA;*/
+        padding: 4px 10px;
       }
     </style>
     <link rel="stylesheet" type="text/css" href="slider.css">
@@ -44,7 +58,7 @@
     </div>
 
     <div>
-      <input type="range" id="size" name="size" min="5" value="7" max="11" oninput="on_size_change(parseInt(this.value))" onchange="on_size_change(parseInt(this.value))">
+      <input type="range" id="size" name="size" min="5" value="7" max="15" oninput="on_size_change(parseInt(this.value))" onchange="on_size_change(parseInt(this.value))">
       <label id="size_label" for="size">Size: 7x7</label>
     </div>
 
@@ -60,7 +74,7 @@
 
     <br/>
     <br/>
-    <canvas id="hobo_canvas" width="480" height="640"></canvas>
+    <canvas id="hobo_canvas" width="480" height="800"></canvas>
   </body>
 </html>
 
