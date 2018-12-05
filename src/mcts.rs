@@ -111,9 +111,9 @@ impl GameState {
 
         if win_margin == 0 {
             // A tie: not good, but better than loosing
-            vec![0.1; self.num_players]
+            vec![0.5; self.num_players]
         } else {
-            let margin_score = (win_margin as f64) / 100.0; // ARBRITRARY
+            let margin_score = (win_margin as f64) / 10.0; // ARBRITRARY
             let mut score = vec![-margin_score; self.num_players];
             score[winner] = 1.0 + margin_score;
             score
