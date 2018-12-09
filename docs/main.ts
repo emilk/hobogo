@@ -5,6 +5,18 @@ interface Coord {
   y: number;
 }
 
+interface Settings {
+  board_size: number;
+  num_humans: number;
+  num_cpus: number;
+}
+
+interface State {
+  board: Board;
+  next_player: number;
+  settings: Settings;
+}
+
 // ----------------------------------------------------------------------------
 
 // the `wasm_bindgen` global is set to the exports of the Rust module. Override with wasm-bindgen --no-modules-global
@@ -37,17 +49,17 @@ function board_to_wasm(board: Board) {
   return wasm_board;
 }
 
-function ai_move(board: Board, player: Player) {
-  return wasm_bindgen.ai_move(board_to_wasm(board), player_to_wasm(player), num_players());
+function ai_move(state: State) {
+  return wasm_bindgen.ai_move(board_to_wasm(state.board), player_to_wasm(state.next_player), num_players());
 }
 
-function game_over(board: Board) {
-  return wasm_bindgen.game_over(board_to_wasm(board), num_players());
+function is_game_over(state: State) {
+  return wasm_bindgen.game_over(board_to_wasm(state.board), num_players());
 }
 
 // ----------------------------------------------------------------------------
 
-function player_name(player: Player): string {
+function player_name(state: State, player: Player): string {
   let name;
   if (player === 0) {
     name = "blue";
@@ -61,7 +73,7 @@ function player_name(player: Player): string {
     name = `p${player}`;
   }
 
-  if (player >= g_num_humans) {
+  if (player >= state.settings.num_humans) {
     name += " (AI)";
   }
 
@@ -99,14 +111,14 @@ function blend_hex_colors(c0, c1, p) {
                   (Math.round((B2 - B1) * p) + B1)).toString(16).slice(1);
 }
 
-function cell_color(board: Board, coord: Coord) {
-  const claimer = claimed_by(board, coord);
+function cell_color(state: State, coord: Coord) {
+  const claimer = claimed_by(state.board, coord);
   if (claimer !== null) {
     return player_color(claimer);
   }
 
-  const is_human = g_current_player < g_num_humans;
-  if (is_human && !is_valid_move(board, coord, g_current_player)) {
+  const is_human = state.next_player < state.settings.num_humans;
+  if (is_human && !is_valid_move(state.board, coord, state.next_player)) {
     // The current human can´t move here.
     return "#555555";
   }
@@ -167,11 +179,11 @@ function rounded_rect(ctx, x: number, y: number, width: number, height: number, 
   return ctx;
 }
 
-function paint_board(canvas, board: Board, hovered: Coord) {
-
+function paint_board(canvas, state: State, hovered: Coord) {
   if (hovered !== null) {
-    board = make_move(board, hovered, g_current_player) || board; // PREVIEW!
+    state = make_move(state, hovered, state.next_player) || state; // PREVIEW!
   }
+  const board = state.board;
 
   const ctx = canvas.getContext("2d");
   ctx.font = "20px Palatino";
@@ -214,7 +226,7 @@ function paint_board(canvas, board: Board, hovered: Coord) {
       const center_x = (x + 0.5) * cell_size;
       const center_y = (y + 0.5) * cell_size;
 
-      ctx.fillStyle = cell_color(board, {x, y});
+      ctx.fillStyle = cell_color(state, {x, y});
 
       if (board_at(board, {x, y}) === null) {
         const radius = 0.25 * cell_size;
@@ -277,12 +289,12 @@ function paint_board(canvas, board: Board, hovered: Coord) {
     const LINES_SPACING = 32;
 
     let y = board.length * cell_size + 64;
-    if (game_over(board)) {
+    if (is_game_over(state)) {
       ctx.fillStyle = "white";
       ctx.fillText(`GAME OVER`, 12, y);
     } else {
-      ctx.fillStyle = player_color(g_current_player);
-      ctx.fillText(`${player_name(g_current_player)} to play`, 12, y);
+      ctx.fillStyle = player_color(state.next_player);
+      ctx.fillText(`${player_name(state, state.next_player)} to play`, 12, y);
     }
     y += 1.5 * LINES_SPACING;
 
@@ -293,7 +305,7 @@ function paint_board(canvas, board: Board, hovered: Coord) {
     const score = get_score(board);
     for (let pi = 0; pi < num_players(); ++pi) {
       ctx.fillStyle = player_color(pi);
-      ctx.fillText(`${player_name(pi)}`, 12, y);
+      ctx.fillText(`${player_name(state, pi)}`, 12, y);
       ctx.textAlign = "end";
       ctx.fillText(`${score[pi]}`, 200, y);
       ctx.textAlign = "start";
@@ -310,8 +322,6 @@ function get_mouse_pos(canvas, evt): Coord {
     y: evt.clientY - rect.top,
   };
 }
-
-const g_canvas = document.getElementById("hobo_canvas");
 
 function array(n, value_maker) {
   const board = [];
@@ -406,89 +416,97 @@ function clone(obj) {
   return JSON.parse(JSON.stringify(obj));
 }
 
-function make_move(board: Board, coord: Coord, player: Player): Board {
+function make_move(state: State, coord: Coord, player: Player): State | null {
   const is_pass = (coord.x === -1 && coord.y === -1);
-  if (is_pass) { return clone(board); }
-
-  if (!is_valid_move(board, coord, player)) {
+  if (!is_pass && !is_valid_move(state.board, coord, player)) {
     return null;
   }
 
-  board = clone(board);
-  board[coord.y][coord.x] = player;
+  const new_state = clone(state);
 
-  return board;
+  if (!is_pass) {
+    new_state.board[coord.y][coord.x] = player;
+  }
+  new_state.next_player = (new_state.next_player + 1) % num_players();
+
+  return new_state;
 }
 
-let g_board_size = 7;
-let g_board = make_board(g_board_size);
-let g_current_player = 0;
-let g_num_humans = 1;
-let g_num_cpus = 1;
+// ----------------------------------------------------------------------------
+
+const g_canvas = document.getElementById("hobo_canvas");
+let g_state: State = {
+  board: make_board(7),
+  next_player: 0,
+  settings: {
+    board_size: 7,
+    num_cpus: 1,
+    num_humans: 1,
+  },
+};
 
 function num_players() {
-  return g_num_humans + g_num_cpus;
+  return g_state.settings.num_humans + g_state.settings.num_cpus;
 }
 
 function start_game() {
   g_canvas.addEventListener("mousemove", (evt) => {
     const mouse_pos = get_mouse_pos(g_canvas, evt);
-    const hovered = hovered_cell(g_board, mouse_pos);
-    paint_board(g_canvas, g_board, hovered);
+    const hovered = hovered_cell(g_state.board, mouse_pos);
+    paint_board(g_canvas, g_state, hovered);
   }, false);
 
   g_canvas.addEventListener("mousedown", (evt) => {
     const mouse_pos = get_mouse_pos(g_canvas, evt);
-    const hovered = hovered_cell(g_board, mouse_pos);
+    const hovered = hovered_cell(g_state.board, mouse_pos);
     try_make_move(hovered);
   }, false);
 
-  paint_board(g_canvas, g_board, null);
+  paint_board(g_canvas, g_state, null);
 }
 
 function try_make_move(coord: Coord) {
-    const new_board = make_move(g_board, coord, g_current_player);
-    if (new_board) {
-      g_board = new_board;
-      g_current_player = (g_current_player + 1) % num_players();
-      paint_board(g_canvas, g_board, null);
-      if (g_current_player >= g_num_humans) {
+    const new_state = make_move(g_state, coord, g_state.next_player);
+    if (new_state) {
+      g_state = new_state;
+      paint_board(g_canvas, g_state, null);
+      if (g_state.next_player >= g_state.settings.num_humans) {
         setTimeout(make_ai_move, 100);
       }
     } else {
-      console.error(`Cannot make move at ${coord_name(coord)} for player ${player_name(g_current_player)}`);
+      console.error(`Cannot make move at ${coord_name(coord)} for player ${player_name(g_state, g_state.next_player)}`);
     }
 }
 
 function make_ai_move() {
-  const coord = ai_move(g_board, g_current_player);
-  console.info(`AI ${player_name(g_current_player)}: ${coord_name(coord)}`);
+  const coord = ai_move(g_state);
+  console.info(`AI ${player_name(g_state, g_state.next_player)}: ${coord_name(coord)}`);
   try_make_move(coord);
-  paint_board(g_canvas, g_board, null);
+  paint_board(g_canvas, g_state, null);
 }
 
 export function on_size_change(size: number) {
-  g_board_size = size;
+  g_state.settings.board_size = size;
   document.getElementById("size_label").innerHTML = `Size: ${size}x${size}`;
   new_game();
 }
 
 export function on_humans_change(humans: number) {
   document.getElementById("humans_label").innerHTML = `Humans: ${humans}`;
-  g_num_humans = humans;
+  g_state.settings.num_humans = humans;
 }
 
 export function on_cpus_change(cpus: number) {
   document.getElementById("cpus_label").innerHTML = `Bots: ${cpus}`;
-  g_num_cpus = cpus;
+  g_state.settings.num_cpus = cpus;
 }
 
 export function new_game() {
-  console.log(`Starting new ${g_board_size}x${g_board_size} game with ${g_num_humans} and  ${g_num_cpus} cpus.`);
-  g_board = make_board(g_board_size);
-  g_current_player = 0;
-  paint_board(g_canvas, g_board, null);
-  if (g_num_humans === 0) {
+  const board_size = g_state.settings.board_size;
+  g_state.board = make_board(board_size);
+  g_state.next_player = 0;
+  paint_board(g_canvas, g_state, null);
+  if (g_state.settings.num_humans === 0) {
     make_ai_move();
   }
 }
