@@ -11,3 +11,14 @@ You can play against an AI here: https://emilk.github.io/hobogo/index.html
 
 ## The AI
 The AI is doing blind Monte Carlo Tree Search for one second.
+
+## TODO:
+* Highlight last move
+* Current player color
+* Undo
+* Detect player not being able to make a move
+* Humans not always first
+* ABC/123 on every side
+* Better colors
+* Non-square board
+* Parametric AI (N number of cycles). Will make it speed up towards endgame?

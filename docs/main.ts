@@ -96,20 +96,15 @@ function cell_color(board, coord) {
     return player_color(owner);
   }
 
-  const ruler = ruled_by(board, coord);
-  if (ruler !== null) {
-    return blend_hex_colors("#333333", player_color(ruler), 0.3);
-  }
-
   const claimer = claimed_by(board, coord);
   if (claimer !== null) {
-    return blend_hex_colors("#666666", player_color(claimer), 0.3);
+    return player_color(claimer);
   }
 
-  const is_ai = g_current_player >= g_num_humans;
-  if (!is_ai && !is_valid_move(board, coord, g_current_player)) {
+  const is_human = g_current_player < g_num_humans;
+  if (is_human && !is_valid_move(board, coord, g_current_player)) {
     // The current human can´t move here.
-    return "#666666";
+    return "#555555";
   }
 
   return "#999999"; // Free (at least for some).
@@ -191,24 +186,16 @@ function paint_board(canvas, board, hovered) {
             const neighbor_coord = {x: x + dx, y: y + dy};
             const neightbor_val = board_at(board, neighbor_coord);
             if (neightbor_val !== null) {
-              const color = player_color(neightbor_val);
-              // color += "80"; // Transparent
-
-              // const f = (dx * dy === 0) ? 0.30 : 0.35;
-              // const cx = (x + dx * f + 0.5) * cell_size;
-              // const cy = (y + dy * f + 0.5) * cell_size;
-
-              // const radius = 2;
-              // ctx.beginPath();
-              // ctx.arc(cx, cy, radius, 0, 2 * Math.PI, false);
-              // ctx.fillStyle = color;
-              // ctx.fill();
+              let color = player_color(neightbor_val);
+              color += "80"; // Transparent
 
               ctx.beginPath();
-              ctx.lineWidth = 3;
+              ctx.lineWidth = 4;
               ctx.strokeStyle = color;
               ctx.moveTo((x + 0.5) * cell_size, (y + 0.5) * cell_size);
-              const f = (dx * dy === 0) ? 0.45 : 0.38;
+              // const f = (dx * dy === 0) ? 0.45 : 0.38;
+              // const f = 1.0;
+              const f = 0.45 / Math.sqrt(dx * dx + dy * dy);
               ctx.lineTo((x + dx * f + 0.5) * cell_size, (y + dy * f + 0.5) * cell_size);
               ctx.stroke();
             }
@@ -223,14 +210,21 @@ function paint_board(canvas, board, hovered) {
       const center_x = (x + 0.5) * cell_size;
       const center_y = (y + 0.5) * cell_size;
 
-      const hw = 0.5 * cell_size * (board_at(board, {x, y}) === null ? 0.7 : 0.85);
-      const left = center_x - hw;
-      const top = center_y - hw;
-      const right = center_x + hw;
-      const bottom = center_y + hw;
-
       ctx.fillStyle = cell_color(board, {x, y});
-      rounded_rect(ctx, left, top, 2 * hw, 2 * hw, 0.45 * hw).fill();
+
+      if (board_at(board, {x, y}) === null) {
+        const radius = 0.25 * cell_size;
+        ctx.beginPath();
+        ctx.arc(center_x, center_y, radius, 0, 2 * Math.PI, false);
+        ctx.fill();
+      } else {
+        const hw = 0.42 * cell_size;
+        const left = center_x - hw;
+        const top = center_y - hw;
+        const right = center_x + hw;
+        const bottom = center_y + hw;
+        rounded_rect(ctx, left, top, 2 * hw, 2 * hw, 0.45 * hw).fill();
+      }
 
       const PAINT_INFLUENCE_CIRCLES = false;
       if (board[y][x] === null && PAINT_INFLUENCE_CIRCLES) {
@@ -240,11 +234,10 @@ function paint_board(canvas, board, hovered) {
             const neighbor_coord = {x: x + dx, y: y + dy};
             const neightbor_val = board_at(board, neighbor_coord);
             if (neightbor_val !== null) {
-              const color = player_color(neightbor_val);
-              // color += "80"; // Transparent
+              let color = player_color(neightbor_val);
+              color += "80"; // Transparent
 
-              // const f = (dx * dy === 0) ? 0.25 : 0.30; // Inside
-              const f = (dx * dy === 0) ? 0.40 : 0.36; // Outside
+              const f = 0.40 / Math.sqrt(dx * dx + dy * dy);
               const cx = (x + dx * f + 0.5) * cell_size;
               const cy = (y + dy * f + 0.5) * cell_size;
 
@@ -252,36 +245,6 @@ function paint_board(canvas, board, hovered) {
               ctx.beginPath();
               ctx.arc(cx, cy, radius, 0, 2 * Math.PI, false);
               ctx.fillStyle = color;
-              ctx.fill();
-            }
-          }
-        }
-      }
-
-      const PAINT_INFLUENCE = false;
-      if (board[y][x] === null && PAINT_INFLUENCE) {
-        const influences = influences_at(board, {x, y});
-        if (num_players() === 2) {
-          if (influences[0] !== influences[1]) {
-            const font_size = 10;
-            ctx.font = `${font_size}pt monospace`;
-            const player = influences[0] > influences[1] ? 0 : 1;
-            const text =
-              (influences[player] > num_neighbors(board, {x, y}) / 2) ? "X"
-              : `${Math.abs(influences[player] - influences[1 - player])}`;
-            ctx.fillStyle = player_color(player);
-            ctx.fillText(text, (left + right) / 2 - font_size / 2, (top + bottom) / 2 + font_size / 2);
-          }
-        } else {
-          for (let pi = 0; pi < num_players(); ++pi) {
-            for (let i = 0; i < influences[pi]; ++i) {
-              const cx = left + cell_size * (1 + i) / 5;
-              const cy = top + cell_size * (1 + pi) / (num_players() + 1);
-
-              const radius = 4;
-              ctx.beginPath();
-              ctx.arc(cx, cy, radius, 0, 2 * Math.PI, false);
-              ctx.fillStyle = player_color(pi);
               ctx.fill();
             }
           }
