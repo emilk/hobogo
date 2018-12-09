@@ -15,7 +15,6 @@ The AI is doing blind Monte Carlo Tree Search for one second.
 ## TODO:
 * Highlight last move
 * Current player color
-* Undo
 * Detect player not being able to make a move
 * Humans not always first
 * ABC/123 on every side

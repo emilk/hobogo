@@ -452,6 +452,24 @@ let g_state: State = {
   },
 };
 
+const g_undo_stack: State[] = [];
+
+function save_undo_point() {
+  g_undo_stack.push(g_state);
+  while (g_undo_stack.length > 100) {
+    g_undo_stack.shift();
+  }
+}
+
+function set_new_state(state: State) {
+  g_state = state;
+  paint_board(g_canvas, g_state, null);
+
+  if (g_state.next_player >= g_state.settings.num_humans) {
+    setTimeout(make_ai_move, 100);
+  }
+}
+
 function start_game() {
   g_canvas.addEventListener("mousemove", (evt) => {
     const mouse_pos = get_mouse_pos(g_canvas, evt);
@@ -462,6 +480,7 @@ function start_game() {
   g_canvas.addEventListener("mousedown", (evt) => {
     const mouse_pos = get_mouse_pos(g_canvas, evt);
     const hovered = hovered_cell(g_state.board, mouse_pos);
+    save_undo_point();
     try_make_move(hovered);
   }, false);
 
@@ -471,11 +490,7 @@ function start_game() {
 function try_make_move(coord: Coord) {
     const new_state = make_move(g_state, coord, g_state.next_player);
     if (new_state) {
-      g_state = new_state;
-      paint_board(g_canvas, g_state, null);
-      if (g_state.next_player >= g_state.settings.num_humans) {
-        setTimeout(make_ai_move, 100);
-      }
+      set_new_state(new_state);
     } else {
       console.error(`Cannot make move at ${coord_name(coord)} for player ${player_name(g_state, g_state.next_player)}`);
     }
@@ -489,32 +504,47 @@ function make_ai_move() {
 }
 
 export function on_size_change(size: number) {
-  g_state.settings.board_size = size;
   document.getElementById("size_label").innerHTML = `Size: ${size}x${size}`;
-  new_game();
+
+  const new_settings = clone(g_state.settings);
+  new_settings.board_size = size;
+  new_game(new_settings);
 }
 
 export function on_humans_change(humans: number) {
   document.getElementById("humans_label").innerHTML = `Humans: ${humans}`;
-  g_state.settings.num_humans = humans;
+  const new_settings = clone(g_state.settings);
+  new_settings.num_humans = humans;
+  new_game(new_settings);
 }
 
 export function on_cpus_change(cpus: number) {
   document.getElementById("cpus_label").innerHTML = `Bots: ${cpus}`;
-  g_state.settings.num_cpus = cpus;
+  const new_settings = clone(g_state.settings);
+  new_settings.num_cpus = cpus;
+  new_game(new_settings);
 }
 
-export function new_game() {
-  const board_size = g_state.settings.board_size;
-  g_state.board = make_board(board_size);
-  g_state.next_player = 0;
+export function new_game(settings: Settings) {
+  const board_size = settings.board_size;
+  const state: State = {
+    board: make_board(board_size),
+    next_player: 0,
+    settings: clone(settings),
+  };
+  save_undo_point();
+  set_new_state(state);
+}
+
+export function undo() {
+  if (g_undo_stack.length === 0) { return; }
+  g_state = g_undo_stack.pop();
   paint_board(g_canvas, g_state, null);
-  if (g_state.settings.num_humans === 0) {
-    make_ai_move();
-  }
 }
 
-(document as any).on_size_change = on_size_change; // HACK
-(document as any).on_humans_change = on_humans_change; // HACK
-(document as any).on_cpus_change = on_cpus_change; // HACK
-(document as any).new_game = new_game; // HACK
+// Hacky way to export functions:
+(document as any).on_size_change = on_size_change;
+(document as any).on_humans_change = on_humans_change;
+(document as any).on_cpus_change = on_cpus_change;
+(document as any).new_game = () => new_game(g_state.settings);
+(document as any).undo = undo;
