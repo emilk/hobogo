@@ -123,7 +123,6 @@ function hovered_cell(board, mouse_pos) {
     }
     return null;
 }
-var PAINT_INFLUENCE = false;
 function column_name(x) {
     return String.fromCharCode(x + 65);
 }
@@ -158,6 +157,41 @@ function paint_board(canvas, board, hovered) {
     ctx.fillStyle = "#111111";
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     var cell_size = calc_cell_size(board);
+    var PAINT_INFLUENCE_CONNECTIONS = false;
+    for (var y = 0; y < board.length; ++y) {
+        for (var x = 0; x < board[y].length; ++x) {
+            if (board[y][x] === null && PAINT_INFLUENCE_CONNECTIONS) {
+                for (var dy = -1; dy <= +1; ++dy) {
+                    for (var dx = -1; dx <= +1; ++dx) {
+                        if (dx === 0 && dy === 0) {
+                            continue;
+                        }
+                        var neighbor_coord = { x: x + dx, y: y + dy };
+                        var neightbor_val = board_at(board, neighbor_coord);
+                        if (neightbor_val !== null) {
+                            var color = player_color(neightbor_val);
+                            // color += "80"; // Transparent
+                            // const f = (dx * dy === 0) ? 0.30 : 0.35;
+                            // const cx = (x + dx * f + 0.5) * cell_size;
+                            // const cy = (y + dy * f + 0.5) * cell_size;
+                            // const radius = 2;
+                            // ctx.beginPath();
+                            // ctx.arc(cx, cy, radius, 0, 2 * Math.PI, false);
+                            // ctx.fillStyle = color;
+                            // ctx.fill();
+                            ctx.beginPath();
+                            ctx.lineWidth = 3;
+                            ctx.strokeStyle = color;
+                            ctx.moveTo((x + 0.5) * cell_size, (y + 0.5) * cell_size);
+                            var f = (dx * dy === 0) ? 0.45 : 0.38;
+                            ctx.lineTo((x + dx * f + 0.5) * cell_size, (y + dy * f + 0.5) * cell_size);
+                            ctx.stroke();
+                        }
+                    }
+                }
+            }
+        }
+    }
     for (var y = 0; y < board.length; ++y) {
         for (var x = 0; x < board[y].length; ++x) {
             var center_x = (x + 0.5) * cell_size;
@@ -169,6 +203,32 @@ function paint_board(canvas, board, hovered) {
             var bottom = center_y + hw;
             ctx.fillStyle = cell_color(board, { x: x, y: y });
             rounded_rect(ctx, left, top_2, 2 * hw, 2 * hw, 0.45 * hw).fill();
+            var PAINT_INFLUENCE_CIRCLES = false;
+            if (board[y][x] === null && PAINT_INFLUENCE_CIRCLES) {
+                for (var dy = -1; dy <= +1; ++dy) {
+                    for (var dx = -1; dx <= +1; ++dx) {
+                        if (dx === 0 && dy === 0) {
+                            continue;
+                        }
+                        var neighbor_coord = { x: x + dx, y: y + dy };
+                        var neightbor_val = board_at(board, neighbor_coord);
+                        if (neightbor_val !== null) {
+                            var color = player_color(neightbor_val);
+                            // color += "80"; // Transparent
+                            // const f = (dx * dy === 0) ? 0.25 : 0.30; // Inside
+                            var f = (dx * dy === 0) ? 0.40 : 0.36; // Outside
+                            var cx = (x + dx * f + 0.5) * cell_size;
+                            var cy = (y + dy * f + 0.5) * cell_size;
+                            var radius = 3;
+                            ctx.beginPath();
+                            ctx.arc(cx, cy, radius, 0, 2 * Math.PI, false);
+                            ctx.fillStyle = color;
+                            ctx.fill();
+                        }
+                    }
+                }
+            }
+            var PAINT_INFLUENCE = false;
             if (board[y][x] === null && PAINT_INFLUENCE) {
                 var influences = influences_at(board, { x: x, y: y });
                 if (num_players() === 2) {
@@ -209,7 +269,7 @@ function paint_board(canvas, board, hovered) {
     for (var y = 0; y < board[0].length; ++y) {
         ctx.fillStyle = "white";
         ctx.textAlign = "center";
-        ctx.fillText("" + row_name(y), board[0].length * cell_size + 12, (y + 0.5) * cell_size + 6);
+        ctx.fillText("" + row_name(y), board[0].length * cell_size + 12, (y + 0.5) * cell_size + 8);
         ctx.textAlign = "start";
     }
     {
