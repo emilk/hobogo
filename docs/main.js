@@ -83,18 +83,14 @@ function blend_hex_colors(c0, c1, p) {
         (Math.round((B2 - B1) * p) + B1)).toString(16).slice(1);
 }
 function cell_color(board, coord) {
-    var owner = board_at(board, coord);
-    if (owner !== null) {
-        return player_color(owner);
-    }
     var claimer = claimed_by(board, coord);
     if (claimer !== null) {
         return player_color(claimer);
     }
-    var is_ai = g_current_player >= g_num_humans;
-    if (!is_ai && !is_valid_move(board, coord, g_current_player)) {
+    var is_human = g_current_player < g_num_humans;
+    if (is_human && !is_valid_move(board, coord, g_current_player)) {
         // The current human can´t move here.
-        return "#666666";
+        return "#555555";
     }
     return "#999999"; // Free (at least for some).
 }
@@ -261,7 +257,7 @@ function paint_board(canvas, board, hovered) {
             ctx.fillStyle = player_color(pi);
             ctx.fillText("" + player_name(pi), 12, y);
             ctx.textAlign = "end";
-            ctx.fillText("" + (score.certain[pi] + score.claimed[pi]), 200, y);
+            ctx.fillText("" + score[pi], 200, y);
             ctx.textAlign = "start";
             y += LINES_SPACING;
         }
@@ -298,21 +294,6 @@ function is_board_at(board, coord) {
 function board_at(board, coord) {
     return is_board_at(board, coord) ? board[coord.y][coord.x] : null;
 }
-function num_neighbors(board, coord) {
-    var num = 0;
-    for (var dy = -1; dy <= +1; ++dy) {
-        for (var dx = -1; dx <= +1; ++dx) {
-            if (dx === 0 && dy === 0) {
-                continue;
-            }
-            var neighbor_coord = { x: coord.x + dx, y: coord.y + dy };
-            if (is_board_at(board, neighbor_coord)) {
-                num += 1;
-            }
-        }
-    }
-    return num;
-}
 function influences_at(board, coord) {
     var influences = array(num_players(), function (_) { return 0; });
     for (var dy = -1; dy <= +1; ++dy) {
@@ -328,20 +309,6 @@ function influences_at(board, coord) {
         }
     }
     return influences;
-}
-// This piece of land can never be taken by anyone but...
-function ruled_by(board, coord) {
-    if (board[coord.y][coord.x] !== null) {
-        return board[coord.y][coord.x];
-    }
-    var influences = influences_at(board, coord);
-    for (var pi = 0; pi < num_players(); ++pi) {
-        if (influences[pi] > num_neighbors(board, coord) / 2) {
-            // Player WILL win this, no matter what.
-            return pi;
-        }
-    }
-    return null;
 }
 // This piece of ground is by majority influenced by...
 function claimed_by(board, coord) {
@@ -363,38 +330,16 @@ function claimed_by(board, coord) {
     return null;
 }
 function get_score(board) {
-    var score = {
-        certain: array(num_players(), function (_) { return 0; }),
-        claimed: array(num_players(), function (_) { return 0; }),
-        parities: 0
-    };
+    var score = array(num_players(), function (_) { return 0; });
     for (var y = 0; y < board.length; ++y) {
         for (var x = 0; x < board[y].length; ++x) {
-            var ruler = ruled_by(board, { x: x, y: y });
-            if (ruler !== null) {
-                score.certain[ruler] += 1;
-            }
-            else {
-                var claimer = claimed_by(board, { x: x, y: y });
-                if (claimer !== null) {
-                    score.claimed[claimer] += 1;
-                }
-                else {
-                    score.parities += 1;
-                }
+            var claimer = claimed_by(board, { x: x, y: y });
+            if (claimer !== null) {
+                score[claimer] += 1;
             }
         }
     }
     return score;
-}
-function fill_in(old_board) {
-    var new_board = make_board(old_board.length);
-    for (var y = 0; y < old_board.length; ++y) {
-        for (var x = 0; x < old_board[y].length; ++x) {
-            new_board[y][x] = claimed_by(old_board, { x: x, y: y });
-        }
-    }
-    return new_board;
 }
 function is_valid_move(board, coord, player) {
     if (coord === null) {
@@ -430,9 +375,6 @@ function make_move(board, coord, player) {
     }
     board = clone(board);
     board[coord.y][coord.x] = player;
-    if (game_over(board)) {
-        board = fill_in(board);
-    }
     return board;
 }
 var g_board_size = 7;

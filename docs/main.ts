@@ -1,3 +1,12 @@
+type Player = number;
+type Board = Player[][];
+interface Coord {
+  x: number;
+  y: number;
+}
+
+// ----------------------------------------------------------------------------
+
 // the `wasm_bindgen` global is set to the exports of the Rust module. Override with wasm-bindgen --no-modules-global
 declare var wasm_bindgen: any;
 
@@ -13,11 +22,11 @@ wasm_bindgen("./hobogo_bg.wasm")
   .then(wasm_loaded)
   .catch(console.error);
 
-function player_to_wasm(player) {
+function player_to_wasm(player: Player) {
   return player === null ? -1 : player;
 }
 
-function board_to_wasm(board) {
+function board_to_wasm(board: Board) {
   const wasm_board = new Int8Array(board.length * board[0].length);
   let i = 0;
   for (const row of board) {
@@ -28,17 +37,17 @@ function board_to_wasm(board) {
   return wasm_board;
 }
 
-function ai_move(board, player: number) {
+function ai_move(board: Board, player: Player) {
   return wasm_bindgen.ai_move(board_to_wasm(board), player_to_wasm(player), num_players());
 }
 
-function game_over(board) {
+function game_over(board: Board) {
   return wasm_bindgen.game_over(board_to_wasm(board), num_players());
 }
 
 // ----------------------------------------------------------------------------
 
-function player_name(player: number): string {
+function player_name(player: Player): string {
   let name;
   if (player === 0) {
     name = "blue";
@@ -59,7 +68,7 @@ function player_name(player: number): string {
   return name;
 }
 
-function player_color(player: number): string {
+function player_color(player: Player): string {
   if (player === null) {
     return "#AAAAAA";
   }
@@ -90,12 +99,7 @@ function blend_hex_colors(c0, c1, p) {
                   (Math.round((B2 - B1) * p) + B1)).toString(16).slice(1);
 }
 
-function cell_color(board, coord) {
-  const owner = board_at(board, coord);
-  if (owner !== null) {
-    return player_color(owner);
-  }
-
+function cell_color(board: Board, coord: Coord) {
   const claimer = claimed_by(board, coord);
   if (claimer !== null) {
     return player_color(claimer);
@@ -110,11 +114,11 @@ function cell_color(board, coord) {
   return "#999999"; // Free (at least for some).
 }
 
-function calc_cell_size(board) {
+function calc_cell_size(board: Board) {
   return 440 / board.length;
 }
 
-function hovered_cell(board, mouse_pos) {
+function hovered_cell(board: Board, mouse_pos: Coord) {
   const cell_size = calc_cell_size(board);
   for (let y = 0; y < board.length; ++y) {
     for (let x = 0; x < board[y].length; ++x) {
@@ -143,7 +147,7 @@ function row_name(y: number): string {
 }
 
 // Chess name:
-function coord_name(coord): string {
+function coord_name(coord: Coord): string {
   return `${column_name(coord.x)}${row_name(coord.y)}`;
 }
 
@@ -163,7 +167,7 @@ function rounded_rect(ctx, x: number, y: number, width: number, height: number, 
   return ctx;
 }
 
-function paint_board(canvas, board, hovered) {
+function paint_board(canvas, board: Board, hovered: Coord) {
 
   if (hovered !== null) {
     board = make_move(board, hovered, g_current_player) || board; // PREVIEW!
@@ -291,7 +295,7 @@ function paint_board(canvas, board, hovered) {
       ctx.fillStyle = player_color(pi);
       ctx.fillText(`${player_name(pi)}`, 12, y);
       ctx.textAlign = "end";
-      ctx.fillText(`${score.certain[pi] + score.claimed[pi]}`, 200, y);
+      ctx.fillText(`${score[pi]}`, 200, y);
       ctx.textAlign = "start";
       y += LINES_SPACING;
     }
@@ -299,7 +303,7 @@ function paint_board(canvas, board, hovered) {
   }
 }
 
-function get_mouse_pos(canvas, evt) {
+function get_mouse_pos(canvas, evt): Coord {
   const rect = canvas.getBoundingClientRect();
   return {
     x: evt.clientX - rect.left,
@@ -317,35 +321,21 @@ function array(n, value_maker) {
   return board;
 }
 
-function make_board(n) {
+function make_board(n: number): Board {
   return array(n, (_) => array(n, (__) => null));
 }
 
-function is_board_at(board, coord) {
+function is_board_at(board: Board, coord: Coord): boolean {
   if (coord.x < 0 || board[0].length <= coord.x) { return false; }
   if (coord.y < 0 || board.length <= coord.y) { return false; }
   return true;
 }
 
-function board_at(board, coord): number | null {
+function board_at(board: Board, coord: Coord): Player | null {
   return is_board_at(board, coord) ? board[coord.y][coord.x] : null;
 }
 
-function num_neighbors(board, coord) {
-  let num = 0;
-  for (let dy = -1; dy <= +1; ++dy) {
-    for (let dx = -1; dx <= +1; ++dx) {
-      if (dx === 0 && dy === 0) { continue; }
-      const neighbor_coord = {x: coord.x + dx, y: coord.y + dy};
-      if (is_board_at(board, neighbor_coord)) {
-        num += 1;
-      }
-    }
-  }
-  return num;
-}
-
-function influences_at(board, coord) {
+function influences_at(board: Board, coord: Coord): number[] {
   const influences = array(num_players(), (_) => 0);
   for (let dy = -1; dy <= +1; ++dy) {
     for (let dx = -1; dx <= +1; ++dx) {
@@ -360,25 +350,8 @@ function influences_at(board, coord) {
   return influences;
 }
 
-// This piece of land can never be taken by anyone but...
-function ruled_by(board, coord) {
-  if (board[coord.y][coord.x] !== null) {
-    return board[coord.y][coord.x];
-  }
-
-  const influences = influences_at(board, coord);
-  for (let pi = 0; pi < num_players(); ++pi) {
-    if (influences[pi] > num_neighbors(board, coord) / 2) {
-      // Player WILL win this, no matter what.
-      return pi;
-    }
-  }
-
-  return null;
-}
-
 // This piece of ground is by majority influenced by...
-function claimed_by(board, coord) {
+function claimed_by(board: Board, coord: Coord): Player | null {
   if (board[coord.y][coord.x] !== null) {
     return board[coord.y][coord.x];
   }
@@ -399,25 +372,14 @@ function claimed_by(board, coord) {
   return null;
 }
 
-function get_score(board) {
-  const score = {
-    certain: array(num_players(), (_) => 0),
-    claimed: array(num_players(), (_) => 0),
-    parities: 0,
-  };
+function get_score(board: Board): number[] {
+  const score = array(num_players(), (_) => 0);
 
   for (let y = 0; y < board.length; ++y) {
     for (let x = 0; x < board[y].length; ++x) {
-      const ruler = ruled_by(board, {x, y});
-      if (ruler !== null) {
-        score.certain[ruler] += 1;
-      } else {
-        const claimer = claimed_by(board, {x, y});
-        if (claimer !== null) {
-          score.claimed[claimer] += 1;
-        } else {
-          score.parities += 1;
-        }
+      const claimer = claimed_by(board, {x, y});
+      if (claimer !== null) {
+        score[claimer] += 1;
       }
     }
   }
@@ -425,17 +387,7 @@ function get_score(board) {
   return score;
 }
 
-function fill_in(old_board) {
-  const new_board = make_board(old_board.length);
-  for (let y = 0; y < old_board.length; ++y) {
-    for (let x = 0; x < old_board[y].length; ++x) {
-      new_board[y][x] = claimed_by(old_board, {x, y});
-    }
-  }
-  return new_board;
-}
-
-function is_valid_move(board, coord, player) {
+function is_valid_move(board: Board, coord: Coord, player: Player): boolean {
   if (coord === null) { return false; }
   if (coord.x < 0 || board[0].length <= coord.x) { return false; }
   if (coord.y < 0 || board.length <= coord.y) { return false; }
@@ -454,7 +406,7 @@ function clone(obj) {
   return JSON.parse(JSON.stringify(obj));
 }
 
-function make_move(board, coord, player) {
+function make_move(board: Board, coord: Coord, player: Player): Board {
   const is_pass = (coord.x === -1 && coord.y === -1);
   if (is_pass) { return clone(board); }
 
@@ -464,10 +416,6 @@ function make_move(board, coord, player) {
 
   board = clone(board);
   board[coord.y][coord.x] = player;
-
-  if (game_over(board)) {
-    board = fill_in(board);
-  }
 
   return board;
 }
@@ -498,7 +446,7 @@ function start_game() {
   paint_board(g_canvas, g_board, null);
 }
 
-function try_make_move(coord) {
+function try_make_move(coord: Coord) {
     const new_board = make_move(g_board, coord, g_current_player);
     if (new_board) {
       g_board = new_board;
