@@ -50,11 +50,11 @@ function board_to_wasm(board: Board) {
 }
 
 function ai_move(state: State) {
-  return wasm_bindgen.ai_move(board_to_wasm(state.board), player_to_wasm(state.next_player), num_players());
+  return wasm_bindgen.ai_move(board_to_wasm(state.board), player_to_wasm(state.next_player), num_players(state));
 }
 
 function is_game_over(state: State) {
-  return wasm_bindgen.game_over(board_to_wasm(state.board), num_players());
+  return wasm_bindgen.game_over(board_to_wasm(state.board), num_players(state));
 }
 
 // ----------------------------------------------------------------------------
@@ -112,13 +112,13 @@ function blend_hex_colors(c0, c1, p) {
 }
 
 function cell_color(state: State, coord: Coord) {
-  const claimer = claimed_by(state.board, coord);
+  const claimer = claimed_by(state, coord);
   if (claimer !== null) {
     return player_color(claimer);
   }
 
   const is_human = state.next_player < state.settings.num_humans;
-  if (is_human && !is_valid_move(state.board, coord, state.next_player)) {
+  if (is_human && !is_valid_move(state, coord, state.next_player)) {
     // The current human can´t move here.
     return "#555555";
   }
@@ -302,8 +302,8 @@ function paint_board(canvas, state: State, hovered: Coord) {
     ctx.fillText(`Standings:`, 12, y);
     y += LINES_SPACING;
 
-    const score = get_score(board);
-    for (let pi = 0; pi < num_players(); ++pi) {
+    const score = get_score(state);
+    for (let pi = 0; pi < num_players(state); ++pi) {
       ctx.fillStyle = player_color(pi);
       ctx.fillText(`${player_name(state, pi)}`, 12, y);
       ctx.textAlign = "end";
@@ -345,13 +345,13 @@ function board_at(board: Board, coord: Coord): Player | null {
   return is_board_at(board, coord) ? board[coord.y][coord.x] : null;
 }
 
-function influences_at(board: Board, coord: Coord): number[] {
-  const influences = array(num_players(), (_) => 0);
+function influences_at(state: State, coord: Coord): number[] {
+  const influences = array(num_players(state), (_) => 0);
   for (let dy = -1; dy <= +1; ++dy) {
     for (let dx = -1; dx <= +1; ++dx) {
       if (dx === 0 && dy === 0) { continue; }
       const neighbor_coord = {x: coord.x + dx, y: coord.y + dy};
-      const neightbor_val = board_at(board, neighbor_coord);
+      const neightbor_val = board_at(state.board, neighbor_coord);
       if (neightbor_val !== null) {
         influences[neightbor_val] += 1;
       }
@@ -361,15 +361,16 @@ function influences_at(board: Board, coord: Coord): number[] {
 }
 
 // This piece of ground is by majority influenced by...
-function claimed_by(board: Board, coord: Coord): Player | null {
+function claimed_by(state: State, coord: Coord): Player | null {
+  const board = state.board;
   if (board[coord.y][coord.x] !== null) {
     return board[coord.y][coord.x];
   }
 
-  const influences = influences_at(board, coord);
-  for (let player = 0; player < num_players(); ++player) {
+  const influences = influences_at(state, coord);
+  for (let player = 0; player < num_players(state); ++player) {
     let somebody_else_is_as_large = false;
-    for (let other = 0; other < num_players(); ++other) {
+    for (let other = 0; other < num_players(state); ++other) {
       if (player !== other && influences[other] >= influences[player]) {
         somebody_else_is_as_large = true;
       }
@@ -382,12 +383,12 @@ function claimed_by(board: Board, coord: Coord): Player | null {
   return null;
 }
 
-function get_score(board: Board): number[] {
-  const score = array(num_players(), (_) => 0);
-
+function get_score(state: State): number[] {
+  const score = array(num_players(state), (_) => 0);
+  const board = state.board;
   for (let y = 0; y < board.length; ++y) {
     for (let x = 0; x < board[y].length; ++x) {
-      const claimer = claimed_by(board, {x, y});
+      const claimer = claimed_by(state, {x, y});
       if (claimer !== null) {
         score[claimer] += 1;
       }
@@ -397,14 +398,15 @@ function get_score(board: Board): number[] {
   return score;
 }
 
-function is_valid_move(board: Board, coord: Coord, player: Player): boolean {
+function is_valid_move(state: State, coord: Coord, player: Player): boolean {
+  const board = state.board;
   if (coord === null) { return false; }
   if (coord.x < 0 || board[0].length <= coord.x) { return false; }
   if (coord.y < 0 || board.length <= coord.y) { return false; }
   if (board[coord.y][coord.x] !== null) { return false; }
 
-  const influences = influences_at(board, coord);
-  for (let i = 0; i < num_players(); ++i) {
+  const influences = influences_at(state, coord);
+  for (let i = 0; i < num_players(state); ++i) {
     if (influences[i] > influences[player]) {
       return false;
     }
@@ -418,7 +420,7 @@ function clone(obj) {
 
 function make_move(state: State, coord: Coord, player: Player): State | null {
   const is_pass = (coord.x === -1 && coord.y === -1);
-  if (!is_pass && !is_valid_move(state.board, coord, player)) {
+  if (!is_pass && !is_valid_move(state, coord, player)) {
     return null;
   }
 
@@ -427,14 +429,19 @@ function make_move(state: State, coord: Coord, player: Player): State | null {
   if (!is_pass) {
     new_state.board[coord.y][coord.x] = player;
   }
-  new_state.next_player = (new_state.next_player + 1) % num_players();
+  new_state.next_player = (new_state.next_player + 1) % num_players(state);
 
   return new_state;
+}
+
+function num_players(state: State) {
+  return state.settings.num_humans + state.settings.num_cpus;
 }
 
 // ----------------------------------------------------------------------------
 
 const g_canvas = document.getElementById("hobo_canvas");
+
 let g_state: State = {
   board: make_board(7),
   next_player: 0,
@@ -444,10 +451,6 @@ let g_state: State = {
     num_humans: 1,
   },
 };
-
-function num_players() {
-  return g_state.settings.num_humans + g_state.settings.num_cpus;
-}
 
 function start_game() {
   g_canvas.addEventListener("mousemove", (evt) => {

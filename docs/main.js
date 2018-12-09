@@ -23,10 +23,10 @@ function board_to_wasm(board) {
     return wasm_board;
 }
 function ai_move(state) {
-    return wasm_bindgen.ai_move(board_to_wasm(state.board), player_to_wasm(state.next_player), num_players());
+    return wasm_bindgen.ai_move(board_to_wasm(state.board), player_to_wasm(state.next_player), num_players(state));
 }
 function is_game_over(state) {
-    return wasm_bindgen.game_over(board_to_wasm(state.board), num_players());
+    return wasm_bindgen.game_over(board_to_wasm(state.board), num_players(state));
 }
 // ----------------------------------------------------------------------------
 function player_name(state, player) {
@@ -83,12 +83,12 @@ function blend_hex_colors(c0, c1, p) {
         (Math.round((B2 - B1) * p) + B1)).toString(16).slice(1);
 }
 function cell_color(state, coord) {
-    var claimer = claimed_by(state.board, coord);
+    var claimer = claimed_by(state, coord);
     if (claimer !== null) {
         return player_color(claimer);
     }
     var is_human = state.next_player < state.settings.num_humans;
-    if (is_human && !is_valid_move(state.board, coord, state.next_player)) {
+    if (is_human && !is_valid_move(state, coord, state.next_player)) {
         // The current human can´t move here.
         return "#555555";
     }
@@ -253,8 +253,8 @@ function paint_board(canvas, state, hovered) {
         ctx.fillStyle = "white";
         ctx.fillText("Standings:", 12, y);
         y += LINES_SPACING;
-        var score = get_score(board);
-        for (var pi = 0; pi < num_players(); ++pi) {
+        var score = get_score(state);
+        for (var pi = 0; pi < num_players(state); ++pi) {
             ctx.fillStyle = player_color(pi);
             ctx.fillText("" + player_name(state, pi), 12, y);
             ctx.textAlign = "end";
@@ -294,15 +294,15 @@ function is_board_at(board, coord) {
 function board_at(board, coord) {
     return is_board_at(board, coord) ? board[coord.y][coord.x] : null;
 }
-function influences_at(board, coord) {
-    var influences = array(num_players(), function (_) { return 0; });
+function influences_at(state, coord) {
+    var influences = array(num_players(state), function (_) { return 0; });
     for (var dy = -1; dy <= +1; ++dy) {
         for (var dx = -1; dx <= +1; ++dx) {
             if (dx === 0 && dy === 0) {
                 continue;
             }
             var neighbor_coord = { x: coord.x + dx, y: coord.y + dy };
-            var neightbor_val = board_at(board, neighbor_coord);
+            var neightbor_val = board_at(state.board, neighbor_coord);
             if (neightbor_val !== null) {
                 influences[neightbor_val] += 1;
             }
@@ -311,14 +311,15 @@ function influences_at(board, coord) {
     return influences;
 }
 // This piece of ground is by majority influenced by...
-function claimed_by(board, coord) {
+function claimed_by(state, coord) {
+    var board = state.board;
     if (board[coord.y][coord.x] !== null) {
         return board[coord.y][coord.x];
     }
-    var influences = influences_at(board, coord);
-    for (var player = 0; player < num_players(); ++player) {
+    var influences = influences_at(state, coord);
+    for (var player = 0; player < num_players(state); ++player) {
         var somebody_else_is_as_large = false;
-        for (var other = 0; other < num_players(); ++other) {
+        for (var other = 0; other < num_players(state); ++other) {
             if (player !== other && influences[other] >= influences[player]) {
                 somebody_else_is_as_large = true;
             }
@@ -329,11 +330,12 @@ function claimed_by(board, coord) {
     }
     return null;
 }
-function get_score(board) {
-    var score = array(num_players(), function (_) { return 0; });
+function get_score(state) {
+    var score = array(num_players(state), function (_) { return 0; });
+    var board = state.board;
     for (var y = 0; y < board.length; ++y) {
         for (var x = 0; x < board[y].length; ++x) {
-            var claimer = claimed_by(board, { x: x, y: y });
+            var claimer = claimed_by(state, { x: x, y: y });
             if (claimer !== null) {
                 score[claimer] += 1;
             }
@@ -341,7 +343,8 @@ function get_score(board) {
     }
     return score;
 }
-function is_valid_move(board, coord, player) {
+function is_valid_move(state, coord, player) {
+    var board = state.board;
     if (coord === null) {
         return false;
     }
@@ -354,8 +357,8 @@ function is_valid_move(board, coord, player) {
     if (board[coord.y][coord.x] !== null) {
         return false;
     }
-    var influences = influences_at(board, coord);
-    for (var i = 0; i < num_players(); ++i) {
+    var influences = influences_at(state, coord);
+    for (var i = 0; i < num_players(state); ++i) {
         if (influences[i] > influences[player]) {
             return false;
         }
@@ -367,15 +370,18 @@ function clone(obj) {
 }
 function make_move(state, coord, player) {
     var is_pass = (coord.x === -1 && coord.y === -1);
-    if (!is_pass && !is_valid_move(state.board, coord, player)) {
+    if (!is_pass && !is_valid_move(state, coord, player)) {
         return null;
     }
     var new_state = clone(state);
     if (!is_pass) {
         new_state.board[coord.y][coord.x] = player;
     }
-    new_state.next_player = (new_state.next_player + 1) % num_players();
+    new_state.next_player = (new_state.next_player + 1) % num_players(state);
     return new_state;
+}
+function num_players(state) {
+    return state.settings.num_humans + state.settings.num_cpus;
 }
 // ----------------------------------------------------------------------------
 var g_canvas = document.getElementById("hobo_canvas");
@@ -388,9 +394,6 @@ var g_state = {
         num_humans: 1
     }
 };
-function num_players() {
-    return g_state.settings.num_humans + g_state.settings.num_cpus;
-}
 function start_game() {
     g_canvas.addEventListener("mousemove", function (evt) {
         var mouse_pos = get_mouse_pos(g_canvas, evt);
