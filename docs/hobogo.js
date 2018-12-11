@@ -51,6 +51,51 @@
 
     };
 
+    function getArrayU8FromWasm(ptr, len) {
+        return getUint8Memory().subarray(ptr / 1, ptr / 1 + len);
+    }
+
+    let cachedGlobalArgumentPtr = null;
+    function globalArgumentPtr() {
+        if (cachedGlobalArgumentPtr === null) {
+            cachedGlobalArgumentPtr = wasm.__wbindgen_global_argument_ptr();
+        }
+        return cachedGlobalArgumentPtr;
+    }
+
+    let cachegetUint32Memory = null;
+    function getUint32Memory() {
+        if (cachegetUint32Memory === null || cachegetUint32Memory.buffer !== wasm.memory.buffer) {
+            cachegetUint32Memory = new Uint32Array(wasm.memory.buffer);
+        }
+        return cachegetUint32Memory;
+    }
+    /**
+    * @param {Int8Array} arg0
+    * @param {number} arg1
+    * @returns {Uint8Array}
+    */
+    __exports.volatile_cells = function(arg0, arg1) {
+        const [ptr0, len0] = passArray8ToWasm(arg0);
+        const retptr = globalArgumentPtr();
+        try {
+            wasm.volatile_cells(retptr, ptr0, len0, arg1);
+            const mem = getUint32Memory();
+            const rustptr = mem[retptr / 4];
+            const rustlen = mem[retptr / 4 + 1];
+
+            const realRet = getArrayU8FromWasm(rustptr, rustlen).slice();
+            wasm.__wbindgen_free(rustptr, rustlen * 1);
+            return realRet;
+
+
+        } finally {
+            wasm.__wbindgen_free(ptr0, len0 * 1);
+
+        }
+
+    };
+
     const __widl_f_now_Performance_target = typeof Performance === 'undefined' ? null : Performance.prototype.now || function() {
         throw new Error(`wasm-bindgen: Performance.now does not exist`);
     };
@@ -119,14 +164,6 @@
         return addHeapObject(new Function(varg0));
     };
 
-    let cachegetUint32Memory = null;
-    function getUint32Memory() {
-        if (cachegetUint32Memory === null || cachegetUint32Memory.buffer !== wasm.memory.buffer) {
-            cachegetUint32Memory = new Uint32Array(wasm.memory.buffer);
-        }
-        return cachegetUint32Memory;
-    }
-
     __exports.__wbg_call_ee8306f6b79399de = function(arg0, arg1, exnptr) {
         try {
             return addHeapObject(getObject(arg0).call(getObject(arg1)));
@@ -158,10 +195,6 @@
     __exports.__wbg_getRandomValues_2f960218fce3a102 = function(arg0) {
         return addHeapObject(getObject(arg0).getRandomValues);
     };
-
-    function getArrayU8FromWasm(ptr, len) {
-        return getUint8Memory().subarray(ptr / 1, ptr / 1 + len);
-    }
 
     __exports.__wbg_getRandomValues_5581e85fc6616df6 = function(arg0, arg1, arg2) {
         let varg1 = getArrayU8FromWasm(arg1, arg2);

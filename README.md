@@ -1,6 +1,8 @@
 # Hobogo
 Unfinished experimentation with Rust+WASM for making an AI for the game Hobogo.
 
+Play it here: https://emilk.github.io/hobogo/index.html
+
 ## The game
 Hobogo is a a pencil-and-paper board game played on a 7x7 grid. Each player has a mark (e.g. X and O) and take turns making a move. You can only mark a cell if the eight neighboring cells do not have more enemies than friends. The game is over when all cells have been marked. The player with most marks win.
 
@@ -15,7 +17,8 @@ The AI is doing blind Monte Carlo Tree Search for one second.
 ## TODO:
 * Highlight last move
 * Current player color
-* Detect player not being able to make a move
+* Detect game over there are no more volatile cells (cells that can change color)
+* Detect player not being able to make a move (add PASS button, or auto-pass)
 * Humans not always first
 * ABC/123 on every side
 * Better colors

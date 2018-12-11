@@ -58,6 +58,8 @@ impl Influence {
 
 pub type Points = [usize; MAX_PLAYERS];
 
+// ----------------------------------------------------------------------------
+
 #[derive(Copy, Clone, Debug)]
 pub struct Coord {
     pub x: i32,
@@ -69,6 +71,46 @@ impl fmt::Display for Coord {
         write!(f, "{}{}", ('A' as u8 + self.x as u8) as char, self.y + 1)
     }
 }
+
+// ----------------------------------------------------------------------------
+
+struct Neighbors {
+    board_size: (i32, i32),
+    c: Coord,
+    index: i32,
+}
+
+impl Neighbors {
+    fn new(board_size: (i32, i32), c: Coord) -> Self {
+        Neighbors {
+            board_size,
+            c,
+            index: 0,
+        }
+    }
+}
+
+impl Iterator for Neighbors {
+    type Item = Coord;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        while self.index < 9 {
+            let dx = (self.index % 3) - 1;
+            let dy = (self.index / 3) - 1;
+            self.index += 1;
+            let nc = Coord {
+                x: self.c.x + dx,
+                y: self.c.y + dy,
+            };
+            if 0 <= nc.x && nc.x < self.board_size.0 && 0 <= nc.y && nc.y < self.board_size.1 {
+                return Some(nc);
+            }
+        }
+        None
+    }
+}
+
+// ----------------------------------------------------------------------------
 
 #[derive(Clone)]
 pub struct Board {
@@ -105,6 +147,10 @@ impl Board {
         (0..height).flat_map(move |y| (0..width).map(move |x| Coord { x, y }))
     }
 
+    fn neighbors_to(&self, c: Coord) -> Neighbors {
+        Neighbors::new((self.width, self.height), c)
+    }
+
     pub fn is_valid_move(&self, c: Coord, who_wants_to_move: Player, num_players: usize) -> bool {
         if let Some(_) = self.at(c) {
             return false;
@@ -121,32 +167,113 @@ impl Board {
         return true;
     }
 
-    pub fn tally_neighbors(&self, c: Coord) -> ([u32; MAX_PLAYERS], u32) {
-        let mut influences: [u32; MAX_PLAYERS] = [0; MAX_PLAYERS];
+    pub fn tally_neighbors(&self, c: Coord) -> ([u8; MAX_PLAYERS], u8) {
+        let mut influences: [u8; MAX_PLAYERS] = [0; MAX_PLAYERS];
         let mut _num_neighbors = 0;
         let mut empty_neighbors = 0;
-        for dy in -1..=1 {
-            for dx in -1..=1 {
-                if dx == 0 && dy == 0 {
-                    continue;
+        for neighbor_coord in self.neighbors_to(c) {
+            _num_neighbors += 1;
+            if let Some(player) = self.at(neighbor_coord) {
+                influences[player as usize] += 1;
+            } else {
+                empty_neighbors += 1;
+            }
+        }
+
+        (influences, empty_neighbors)
+    }
+
+    /// Returns which cells could still change color:
+    pub fn volatile_cells(&self, num_players: usize) -> Vec<bool> {
+        let n = self.cells.len();
+
+        // Player who currently claims this cell
+        let mut claimed_by = vec![None; n];
+
+        // By how much does this cell have a mjaority?
+        let mut strengths: Vec<i8> = vec![0; n];
+
+        // Coordinates we will pretend to change the player of:
+        let mut flip_stack = Vec::new();
+
+        for c in self.coords() {
+            let ix = self.index(c).unwrap();
+            if let Some(player) = self.at(c) {
+                claimed_by[ix] = Some(player);
+                strengths[ix] = std::i8::MAX;
+            } else {
+                let (influences, _) = self.tally_neighbors(c);
+                let max_player = (0..num_players).max_by_key(|p| influences[*p]).unwrap();
+
+                // Our lead over the other player:
+                let mut strength = std::i8::MAX;
+
+                for other_player in 0..num_players {
+                    if other_player != max_player {
+                        strength =
+                            strength.min((influences[max_player] - influences[other_player]) as i8);
+                    }
                 }
-                let neighbor_coord = Coord {
-                    x: c.x + dx,
-                    y: c.y + dy,
-                };
-                if self.contains(neighbor_coord) {
-                    _num_neighbors += 1;
-                    // TODO: this function should recurse. If a neighbor is ruled by another, we should not count it as a potential empty_neighbor
-                    if let Some(player) = self.at(neighbor_coord) {
-                        influences[player as usize] += 1;
-                    } else {
-                        empty_neighbors += 1;
+
+                strengths[ix] = strength;
+
+                if strength == 0 {
+                    // Tied:
+                    claimed_by[ix] = None;
+                    flip_stack.push(c);
+                } else {
+                    claimed_by[ix] = Some(max_player as Player);
+                }
+            }
+        }
+
+        // Pretend-play on all claimed places:
+        for coord in self.coords() {
+            let ix = self.index(coord).unwrap();
+            if self.at(coord).is_none() {
+                if let Some(claimer) = claimed_by[ix] {
+                    for neighbor_coord in self.neighbors_to(coord) {
+                        let neighbor_ix = self.index(neighbor_coord).unwrap();
+                        if let Some(neighbor_player) = claimed_by[neighbor_ix] {
+                            if neighbor_player != claimer {
+                                strengths[neighbor_ix] -= 1;
+                                if strengths[neighbor_ix] == 0 {
+                                    flip_stack.push(neighbor_coord);
+                                }
+                            }
+                        }
                     }
                 }
             }
         }
 
-        (influences, empty_neighbors)
+        // console_log(format!("Neighbor: {} {}", neighbor_coord, neighbor_ix));
+
+        let mut visited = vec![false; n];
+
+        while let Some(coord) = flip_stack.pop() {
+            let ix = self.index(coord).unwrap();
+            if visited[ix] {
+                continue;
+            }
+            visited[ix] = true;
+            let flip_player = claimed_by[ix];
+
+            // Simulate this flipping this cell by weakening the neighbors:
+            for neighbor_coord in self.neighbors_to(coord) {
+                let neighbor_ix = self.index(neighbor_coord).unwrap();
+                if let Some(neighbor_player) = claimed_by[neighbor_ix] {
+                    if flip_player.is_none() || flip_player.unwrap() == neighbor_player {
+                        strengths[neighbor_ix] -= 1;
+                        if strengths[neighbor_ix] == 0 {
+                            flip_stack.push(neighbor_coord);
+                        }
+                    }
+                }
+            }
+        }
+
+        strengths.iter().map(|s| *s <= 0).collect()
     }
 
     pub fn influence(&self, c: Coord) -> Influence {
@@ -261,36 +388,36 @@ impl Board {
         points
     }
 
-    pub fn leaders(&self) -> Vec<Player> {
-        let points = self.points();
+    // pub fn leaders(&self) -> Vec<Player> {
+    //     let points = self.points();
 
-        let leader_score: usize = *points.iter().max().unwrap();
-        if leader_score == 0 {
-            vec![]
-        } else {
-            (0..MAX_PLAYERS)
-                .filter(|&player| points[player] == leader_score)
-                .map(|player| player as Player)
-                .collect()
-        }
-    }
+    //     let leader_score: usize = *points.iter().max().unwrap();
+    //     if leader_score == 0 {
+    //         vec![]
+    //     } else {
+    //         (0..MAX_PLAYERS)
+    //             .filter(|&player| points[player] == leader_score)
+    //             .map(|player| player as Player)
+    //             .collect()
+    //     }
+    // }
 
-    pub fn leader(&self) -> Option<Player> {
-        let leaders = self.leaders();
-        if leaders.len() == 1 {
-            Some(leaders[0])
-        } else {
-            None
-        }
-    }
+    // pub fn leader(&self) -> Option<Player> {
+    //     let leaders = self.leaders();
+    //     if leaders.len() == 1 {
+    //         Some(leaders[0])
+    //     } else {
+    //         None
+    //     }
+    // }
 
-    pub fn winner(&self, num_players: usize) -> Option<Player> {
-        if self.game_over(num_players) {
-            self.leader()
-        } else {
-            None
-        }
-    }
+    // pub fn winner(&self, num_players: usize) -> Option<Player> {
+    //     if self.game_over(num_players) {
+    //         self.leader()
+    //     } else {
+    //         None
+    //     }
+    // }
 }
 
 impl Board {

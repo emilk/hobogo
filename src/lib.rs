@@ -35,3 +35,12 @@ pub fn ai_move(board: &[i8], player: u8, num_players: usize) -> JsCoord {
         y: coord.y,
     }
 }
+
+#[wasm_bindgen]
+pub fn volatile_cells(board: &[i8], num_players: usize) -> Vec<u8> {
+    Board::from_js(board)
+        .volatile_cells(num_players)
+        .into_iter()
+        .map(|ruled| if ruled { 1 } else { 0 })
+        .collect()
+}

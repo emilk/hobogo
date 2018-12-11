@@ -28,6 +28,9 @@ function ai_move(state) {
 function is_game_over(state) {
     return wasm_bindgen.game_over(board_to_wasm(state.board), num_players(state));
 }
+function volatile_cells(state) {
+    return wasm_bindgen.volatile_cells(board_to_wasm(state.board), num_players(state));
+}
 // ----------------------------------------------------------------------------
 function player_name(state, player) {
     var name;
@@ -82,10 +85,15 @@ function blend_hex_colors(c0, c1, p) {
         (Math.round((G2 - G1) * p) + G1) * 0x100 +
         (Math.round((B2 - B1) * p) + B1)).toString(16).slice(1);
 }
-function cell_color(state, coord) {
+function cell_color(state, coord, is_volatile) {
     var claimer = claimed_by(state, coord);
     if (claimer !== null) {
-        return player_color(claimer);
+        var color = player_color(claimer);
+        if (!is_volatile && state.board[coord.y][coord.x] === null) {
+            color += "B0"; // Add alpha
+            // color = blend_hex_colors(color, "#ffffff", 0.35);
+        }
+        return color;
     }
     var is_human = state.next_player < state.settings.num_humans;
     if (is_human && !is_valid_move(state, coord, state.next_player)) {
@@ -179,11 +187,14 @@ function paint_board(canvas, state, hovered) {
             }
         }
     }
+    var volatiles = volatile_cells(state);
     for (var y = 0; y < board.length; ++y) {
         for (var x = 0; x < board[y].length; ++x) {
             var center_x = (x + 0.5) * cell_size;
             var center_y = (y + 0.5) * cell_size;
-            ctx.fillStyle = cell_color(state, { x: x, y: y });
+            var index = y * board[y].length + x;
+            var is_volatile = volatiles[index];
+            ctx.fillStyle = cell_color(state, { x: x, y: y }, is_volatile);
             if (board_at(board, { x: x, y: y }) === null) {
                 var radius = 0.25 * cell_size;
                 ctx.beginPath();
