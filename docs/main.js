@@ -1,3 +1,54 @@
+// ----------------------------------------------------------------------------
+// Paint module:
+function paintCommand(canvas, cmd) {
+    var ctx = canvas.getContext("2d");
+    switch (cmd.kind) {
+        case "clear":
+            ctx.fillStyle = cmd.fillStyle;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            return;
+        case "line":
+            ctx.beginPath();
+            ctx.lineWidth = cmd.lineWidth;
+            ctx.strokeStyle = cmd.strokeStyle;
+            ctx.moveTo(cmd.from[0], cmd.from[1]);
+            ctx.lineTo(cmd.to[0], cmd.to[1]);
+            ctx.stroke();
+            return;
+        case "circle":
+            ctx.fillStyle = cmd.fillStyle;
+            ctx.beginPath();
+            ctx.arc(cmd.center[0], cmd.center[1], cmd.radius, 0, 2 * Math.PI, false);
+            ctx.fill();
+            return;
+        case "rounded_rect":
+            ctx.fillStyle = cmd.fillStyle;
+            var x = cmd.pos[0];
+            var y = cmd.pos[1];
+            var width = cmd.size[0];
+            var height = cmd.size[1];
+            var radius = cmd.radius;
+            ctx.beginPath();
+            ctx.moveTo(x + radius, y);
+            ctx.lineTo(x + width - radius, y);
+            ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+            ctx.lineTo(x + width, y + height - radius);
+            ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+            ctx.lineTo(x + radius, y + height);
+            ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+            ctx.lineTo(x, y + radius);
+            ctx.quadraticCurveTo(x, y, x + radius, y);
+            ctx.closePath();
+            ctx.fill();
+            return;
+        case "text":
+            ctx.font = cmd.font;
+            ctx.fillStyle = cmd.fillStyle;
+            ctx.textAlign = cmd.textAlign;
+            ctx.fillText(cmd.text, cmd.pos[0], cmd.pos[1]);
+            return;
+    }
+}
 // we'll defer our execution until the wasm is ready to go
 function wasm_loaded() {
     console.log("wasm loaded");
@@ -76,14 +127,18 @@ function blend_hex_colors(c0, c1, p) {
     var f = parseInt(c0.slice(1), 16);
     var t = parseInt(c1.slice(1), 16);
     var R1 = f >> 16;
-    var G1 = f >> 8 & 0x00FF;
-    var B1 = f & 0x0000FF;
+    var G1 = (f >> 8) & 0x00ff;
+    var B1 = f & 0x0000ff;
     var R2 = t >> 16;
-    var G2 = t >> 8 & 0x00FF;
-    var B2 = t & 0x0000FF;
-    return "#" + (0x1000000 + (Math.round((R2 - R1) * p) + R1) * 0x10000 +
-        (Math.round((G2 - G1) * p) + G1) * 0x100 +
-        (Math.round((B2 - B1) * p) + B1)).toString(16).slice(1);
+    var G2 = (t >> 8) & 0x00ff;
+    var B2 = t & 0x0000ff;
+    return ("#" +
+        (0x1000000 +
+            (Math.round((R2 - R1) * p) + R1) * 0x10000 +
+            (Math.round((G2 - G1) * p) + G1) * 0x100 +
+            (Math.round((B2 - B1) * p) + B1))
+            .toString(16)
+            .slice(1));
 }
 function cell_color(state, coord, is_volatile) {
     var claimer = claimed_by(state, coord);
@@ -114,8 +169,10 @@ function hovered_cell(board, mouse_pos) {
             var top_1 = y * cell_size + pad;
             var right = (x + 1) * cell_size - pad;
             var bottom = (y + 1) * cell_size - pad;
-            var is_hovering = left <= mouse_pos.x && mouse_pos.x <= right &&
-                top_1 <= mouse_pos.y && mouse_pos.y <= bottom;
+            var is_hovering = left <= mouse_pos.x &&
+                mouse_pos.x <= right &&
+                top_1 <= mouse_pos.y &&
+                mouse_pos.y <= bottom;
             if (is_hovering) {
                 return { x: x, y: y };
             }
@@ -133,30 +190,13 @@ function row_name(y) {
 function coord_name(coord) {
     return "" + column_name(coord.x) + row_name(coord.y);
 }
-// From https://stackoverflow.com/questions/1255512/how-to-draw-a-rounded-rectangle-on-html-canvas
-function rounded_rect(ctx, x, y, width, height, radius) {
-    ctx.beginPath();
-    ctx.moveTo(x + radius, y);
-    ctx.lineTo(x + width - radius, y);
-    ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
-    ctx.lineTo(x + width, y + height - radius);
-    ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
-    ctx.lineTo(x + radius, y + height);
-    ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
-    ctx.lineTo(x, y + radius);
-    ctx.quadraticCurveTo(x, y, x + radius, y);
-    ctx.closePath();
-    return ctx;
-}
-function paint_board(canvas, state, hovered) {
-    if (hovered !== null) {
-        state = make_move(state, hovered, state.next_player) || state; // PREVIEW!
-    }
+function paint_board_commands(state) {
     var board = state.board;
-    var ctx = canvas.getContext("2d");
-    ctx.font = "20px Palatino";
-    ctx.fillStyle = "#111111";
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    var commands = [];
+    commands.push({
+        fillStyle: "#111111",
+        kind: "clear"
+    });
     var cell_size = calc_cell_size(board);
     var PAINT_INFLUENCE_CONNECTIONS = false;
     for (var y = 0; y < board.length; ++y) {
@@ -172,15 +212,17 @@ function paint_board(canvas, state, hovered) {
                         if (neightbor_val !== null) {
                             var color = player_color(neightbor_val);
                             color += "80"; // Transparent
-                            ctx.beginPath();
-                            ctx.lineWidth = 4;
-                            ctx.strokeStyle = color;
-                            ctx.moveTo((x + 0.5) * cell_size, (y + 0.5) * cell_size);
-                            // const f = (dx * dy === 0) ? 0.45 : 0.38;
-                            // const f = 1.0;
                             var f = 0.45 / Math.sqrt(dx * dx + dy * dy);
-                            ctx.lineTo((x + dx * f + 0.5) * cell_size, (y + dy * f + 0.5) * cell_size);
-                            ctx.stroke();
+                            commands.push({
+                                from: [(x + 0.5) * cell_size, (y + 0.5) * cell_size],
+                                kind: "line",
+                                lineWidth: 4,
+                                strokeStyle: color,
+                                to: [
+                                    (x + dx * f + 0.5) * cell_size,
+                                    (y + dy * f + 0.5) * cell_size,
+                                ]
+                            });
                         }
                     }
                 }
@@ -194,12 +236,15 @@ function paint_board(canvas, state, hovered) {
             var center_y = (y + 0.5) * cell_size;
             var index = y * board[y].length + x;
             var is_volatile = volatiles[index];
-            ctx.fillStyle = cell_color(state, { x: x, y: y }, is_volatile);
+            var fillStyle = cell_color(state, { x: x, y: y }, is_volatile);
             if (board_at(board, { x: x, y: y }) === null) {
-                var radius = 0.25 * cell_size;
-                ctx.beginPath();
-                ctx.arc(center_x, center_y, radius, 0, 2 * Math.PI, false);
-                ctx.fill();
+                var radius = 0.2 * cell_size;
+                commands.push({
+                    center: [center_x, center_y],
+                    fillStyle: fillStyle,
+                    kind: "circle",
+                    radius: radius
+                });
             }
             else {
                 var hw = 0.42 * cell_size;
@@ -207,7 +252,13 @@ function paint_board(canvas, state, hovered) {
                 var top_2 = center_y - hw;
                 var right = center_x + hw;
                 var bottom = center_y + hw;
-                rounded_rect(ctx, left, top_2, 2 * hw, 2 * hw, 0.45 * hw).fill();
+                commands.push({
+                    fillStyle: fillStyle,
+                    kind: "rounded_rect",
+                    pos: [left, top_2],
+                    radius: 0.45 * hw,
+                    size: [2 * hw, 2 * hw]
+                });
             }
             var PAINT_INFLUENCE_CIRCLES = false;
             if (board[y][x] === null && PAINT_INFLUENCE_CIRCLES) {
@@ -221,14 +272,15 @@ function paint_board(canvas, state, hovered) {
                         if (neightbor_val !== null) {
                             var color = player_color(neightbor_val);
                             color += "80"; // Transparent
-                            var f = 0.40 / Math.sqrt(dx * dx + dy * dy);
+                            var f = 0.4 / Math.sqrt(dx * dx + dy * dy);
                             var cx = (x + dx * f + 0.5) * cell_size;
                             var cy = (y + dy * f + 0.5) * cell_size;
-                            var radius = 3;
-                            ctx.beginPath();
-                            ctx.arc(cx, cy, radius, 0, 2 * Math.PI, false);
-                            ctx.fillStyle = color;
-                            ctx.fill();
+                            commands.push({
+                                center: [cx, cy],
+                                fillStyle: color,
+                                kind: "circle",
+                                radius: 3
+                            });
                         }
                     }
                 }
@@ -237,45 +289,90 @@ function paint_board(canvas, state, hovered) {
     }
     // Columns: A, B, C, D, ...
     for (var x = 0; x < board[0].length; ++x) {
-        ctx.fillStyle = "white";
-        ctx.textAlign = "center";
-        ctx.fillText("" + column_name(x), (x + 0.5) * cell_size, board.length * cell_size + 16);
-        ctx.textAlign = "start";
+        commands.push({
+            fillStyle: "white",
+            font: "14px Palatino",
+            kind: "text",
+            pos: [(x + 0.5) * cell_size, board.length * cell_size + 16],
+            text: "" + column_name(x),
+            textAlign: "center"
+        });
     }
     // Rows: 1, 2, 3, ...
     for (var y = 0; y < board[0].length; ++y) {
-        ctx.fillStyle = "white";
-        ctx.textAlign = "center";
-        ctx.fillText("" + row_name(y), board[0].length * cell_size + 12, (y + 0.5) * cell_size + 8);
-        ctx.textAlign = "start";
+        commands.push({
+            fillStyle: "white",
+            font: "14px Palatino",
+            kind: "text",
+            pos: [board[0].length * cell_size + 12, (y + 0.5) * cell_size + 8],
+            text: "" + row_name(y),
+            textAlign: "center"
+        });
     }
+    var text_cmd = {
+        fillStyle: "white",
+        font: "24px Palatino",
+        kind: "text",
+        pos: [12, board.length * cell_size + 64],
+        text: "",
+        textAlign: "start"
+    };
+    var paint_text = function (fillStyle, text, x, y) {
+        commands.push({
+            fillStyle: fillStyle,
+            font: "24px Palatino",
+            kind: "text",
+            pos: [x, y],
+            text: text,
+            textAlign: "start"
+        });
+    };
     {
         var LINES_SPACING = 32;
         var y = board.length * cell_size + 64;
         if (is_game_over(state)) {
-            ctx.fillStyle = "white";
-            ctx.fillText("GAME OVER", 12, y);
+            paint_text("white", "GAME OVER", 12, y);
         }
         else {
-            ctx.fillStyle = player_color(state.next_player);
-            ctx.fillText(player_name(state, state.next_player) + " to play", 12, y);
+            paint_text(player_color(state.next_player), player_name(state, state.next_player) + " to play", 12, y);
         }
         y += 1.5 * LINES_SPACING;
-        ctx.fillStyle = "white";
-        ctx.fillText("Standings:", 12, y);
+        paint_text("white", "Standings:", 12, y);
         y += LINES_SPACING;
         var score = get_score(state);
         for (var pi = 0; pi < num_players(state); ++pi) {
-            ctx.fillStyle = player_color(pi);
-            ctx.fillText("" + player_name(state, pi), 12, y);
-            ctx.textAlign = "end";
-            ctx.fillText("" + score[pi], 200, y);
-            ctx.textAlign = "start";
+            commands.push({
+                fillStyle: player_color(pi),
+                font: "24px Palatino",
+                kind: "text",
+                pos: [24, y],
+                text: "" + player_name(state, pi),
+                textAlign: "start"
+            });
+            commands.push({
+                fillStyle: player_color(pi),
+                font: "24px Palatino",
+                kind: "text",
+                pos: [200, y],
+                text: "" + score[pi],
+                textAlign: "end"
+            });
             y += LINES_SPACING;
         }
-        ctx.fillStyle = "white";
+    }
+    return commands;
+}
+function paint_board(canvas, state, hovered) {
+    if (hovered !== null) {
+        state = make_move(state, hovered, state.next_player) || state; // PREVIEW!
+    }
+    var commands = paint_board_commands(state);
+    for (var _i = 0, commands_1 = commands; _i < commands_1.length; _i++) {
+        var cmd = commands_1[_i];
+        paintCommand(canvas, cmd);
     }
 }
+// ----------------------------------------------------------------------------
 function get_mouse_pos(canvas, evt) {
     var rect = canvas.getBoundingClientRect();
     return {
@@ -380,7 +477,7 @@ function clone(obj) {
     return JSON.parse(JSON.stringify(obj));
 }
 function make_move(state, coord, player) {
-    var is_pass = (coord.x === -1 && coord.y === -1);
+    var is_pass = coord.x === -1 && coord.y === -1;
     if (!is_pass && !is_valid_move(state, coord, player)) {
         return null;
     }

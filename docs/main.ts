@@ -1,3 +1,107 @@
+// ----------------------------------------------------------------------------
+// Paint module:
+
+interface Clear {
+  kind: "clear";
+  fillStyle: string;
+}
+
+interface Line {
+  kind: "line";
+  from: [number, number];
+  lineWidth: number;
+  strokeStyle: string;
+  to: [number, number];
+}
+
+interface Circle {
+  kind: "circle";
+  center: [number, number];
+  fillStyle: string;
+  radius: number;
+}
+
+interface RoundedRect {
+  kind: "rounded_rect";
+  fillStyle: string;
+  pos: [number, number];
+  radius: number;
+  size: [number, number];
+}
+
+interface Text {
+  kind: "text";
+  fillStyle: string;
+  font: string;
+  pos: [number, number];
+  text: string;
+  textAlign: "start" | "center" | "end";
+}
+
+type PaintCmd = Clear | Line | Circle | RoundedRect | Text;
+
+function paintCommand(canvas, cmd: PaintCmd) {
+  const ctx = canvas.getContext("2d");
+
+  switch (cmd.kind) {
+    case "clear":
+      ctx.fillStyle = cmd.fillStyle;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      return;
+
+    case "line":
+      ctx.beginPath();
+      ctx.lineWidth = cmd.lineWidth;
+      ctx.strokeStyle = cmd.strokeStyle;
+      ctx.moveTo(cmd.from[0], cmd.from[1]);
+      ctx.lineTo(cmd.to[0], cmd.to[1]);
+      ctx.stroke();
+      return;
+
+    case "circle":
+      ctx.fillStyle = cmd.fillStyle;
+      ctx.beginPath();
+      ctx.arc(cmd.center[0], cmd.center[1], cmd.radius, 0, 2 * Math.PI, false);
+      ctx.fill();
+      return;
+
+    case "rounded_rect":
+      ctx.fillStyle = cmd.fillStyle;
+      const x = cmd.pos[0];
+      const y = cmd.pos[1];
+      const width = cmd.size[0];
+      const height = cmd.size[1];
+      const radius = cmd.radius;
+      ctx.beginPath();
+      ctx.moveTo(x + radius, y);
+      ctx.lineTo(x + width - radius, y);
+      ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+      ctx.lineTo(x + width, y + height - radius);
+      ctx.quadraticCurveTo(
+        x + width,
+        y + height,
+        x + width - radius,
+        y + height,
+      );
+      ctx.lineTo(x + radius, y + height);
+      ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+      ctx.lineTo(x, y + radius);
+      ctx.quadraticCurveTo(x, y, x + radius, y);
+      ctx.closePath();
+      ctx.fill();
+      return;
+
+    case "text":
+      ctx.font = cmd.font;
+      ctx.fillStyle = cmd.fillStyle;
+      ctx.textAlign = cmd.textAlign;
+      ctx.fillText(cmd.text, cmd.pos[0], cmd.pos[1]);
+      return;
+  }
+}
+
+// ----------------------------------------------------------------------------
+
 type Player = number;
 type Board = Player[][];
 interface Coord {
@@ -50,7 +154,11 @@ function board_to_wasm(board: Board) {
 }
 
 function ai_move(state: State): Coord {
-  return wasm_bindgen.ai_move(board_to_wasm(state.board), player_to_wasm(state.next_player), num_players(state));
+  return wasm_bindgen.ai_move(
+    board_to_wasm(state.board),
+    player_to_wasm(state.next_player),
+    num_players(state),
+  );
 }
 
 function is_game_over(state: State): boolean {
@@ -58,7 +166,10 @@ function is_game_over(state: State): boolean {
 }
 
 function volatile_cells(state: State): boolean[] {
-  return wasm_bindgen.volatile_cells(board_to_wasm(state.board), num_players(state));
+  return wasm_bindgen.volatile_cells(
+    board_to_wasm(state.board),
+    num_players(state),
+  );
 }
 
 // ----------------------------------------------------------------------------
@@ -96,23 +207,31 @@ function player_color(player: Player): string {
   } else if (player === 2) {
     return "#00FF00";
   } else {
-     return "#DDDD00";
-   }
+    return "#DDDD00";
+  }
 }
 
 // blendColors from https://stackoverflow.com/a/13542669
 function blend_hex_colors(c0, c1, p) {
-    const f = parseInt(c0.slice(1), 16);
-    const t = parseInt(c1.slice(1), 16);
-    const R1 = f >> 16;
-    const G1 = f >> 8 & 0x00FF;
-    const B1 = f & 0x0000FF;
-    const R2 = t >> 16;
-    const G2 = t >> 8 & 0x00FF;
-    const B2 = t & 0x0000FF;
-    return "#" + (0x1000000 + (Math.round((R2 - R1) * p) + R1) * 0x10000 +
-                  (Math.round((G2 - G1) * p) + G1) * 0x100 +
-                  (Math.round((B2 - B1) * p) + B1)).toString(16).slice(1);
+  const f = parseInt(c0.slice(1), 16);
+  const t = parseInt(c1.slice(1), 16);
+  const R1 = f >> 16;
+  const G1 = (f >> 8) & 0x00ff;
+  const B1 = f & 0x0000ff;
+  const R2 = t >> 16;
+  const G2 = (t >> 8) & 0x00ff;
+  const B2 = t & 0x0000ff;
+  return (
+    "#" +
+    (
+      0x1000000 +
+      (Math.round((R2 - R1) * p) + R1) * 0x10000 +
+      (Math.round((G2 - G1) * p) + G1) * 0x100 +
+      (Math.round((B2 - B1) * p) + B1)
+    )
+      .toString(16)
+      .slice(1)
+  );
 }
 
 function cell_color(state: State, coord: Coord, is_volatile: boolean) {
@@ -149,10 +268,12 @@ function hovered_cell(board: Board, mouse_pos: Coord) {
       const right = (x + 1) * cell_size - pad;
       const bottom = (y + 1) * cell_size - pad;
       const is_hovering =
-        left <= mouse_pos.x && mouse_pos.x <= right &&
-        top <= mouse_pos.y && mouse_pos.y <= bottom;
+        left <= mouse_pos.x &&
+        mouse_pos.x <= right &&
+        top <= mouse_pos.y &&
+        mouse_pos.y <= bottom;
       if (is_hovering) {
-        return {x, y};
+        return { x, y };
       }
     }
   }
@@ -172,32 +293,15 @@ function coord_name(coord: Coord): string {
   return `${column_name(coord.x)}${row_name(coord.y)}`;
 }
 
-// From https://stackoverflow.com/questions/1255512/how-to-draw-a-rounded-rectangle-on-html-canvas
-function rounded_rect(ctx, x: number, y: number, width: number, height: number, radius: number) {
-  ctx.beginPath();
-  ctx.moveTo(x + radius, y);
-  ctx.lineTo(x + width - radius, y);
-  ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
-  ctx.lineTo(x + width, y + height - radius);
-  ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
-  ctx.lineTo(x + radius, y + height);
-  ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
-  ctx.lineTo(x, y + radius);
-  ctx.quadraticCurveTo(x, y, x + radius, y);
-  ctx.closePath();
-  return ctx;
-}
-
-function paint_board(canvas, state: State, hovered: Coord) {
-  if (hovered !== null) {
-    state = make_move(state, hovered, state.next_player) || state; // PREVIEW!
-  }
+function paint_board_commands(state: State): PaintCmd[] {
   const board = state.board;
 
-  const ctx = canvas.getContext("2d");
-  ctx.font = "20px Palatino";
-  ctx.fillStyle = "#111111";
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  const commands = [];
+
+  commands.push({
+    fillStyle: "#111111",
+    kind: "clear",
+  });
 
   const cell_size = calc_cell_size(board);
 
@@ -207,22 +311,27 @@ function paint_board(canvas, state: State, hovered: Coord) {
       if (board[y][x] === null && PAINT_INFLUENCE_CONNECTIONS) {
         for (let dy = -1; dy <= +1; ++dy) {
           for (let dx = -1; dx <= +1; ++dx) {
-            if (dx === 0 && dy === 0) { continue; }
-            const neighbor_coord = {x: x + dx, y: y + dy};
+            if (dx === 0 && dy === 0) {
+              continue;
+            }
+            const neighbor_coord = { x: x + dx, y: y + dy };
             const neightbor_val = board_at(board, neighbor_coord);
             if (neightbor_val !== null) {
               let color = player_color(neightbor_val);
               color += "80"; // Transparent
 
-              ctx.beginPath();
-              ctx.lineWidth = 4;
-              ctx.strokeStyle = color;
-              ctx.moveTo((x + 0.5) * cell_size, (y + 0.5) * cell_size);
-              // const f = (dx * dy === 0) ? 0.45 : 0.38;
-              // const f = 1.0;
               const f = 0.45 / Math.sqrt(dx * dx + dy * dy);
-              ctx.lineTo((x + dx * f + 0.5) * cell_size, (y + dy * f + 0.5) * cell_size);
-              ctx.stroke();
+
+              commands.push({
+                from: [(x + 0.5) * cell_size, (y + 0.5) * cell_size],
+                kind: "line",
+                lineWidth: 4,
+                strokeStyle: color,
+                to: [
+                  (x + dx * f + 0.5) * cell_size,
+                  (y + dy * f + 0.5) * cell_size,
+                ],
+              });
             }
           }
         }
@@ -239,42 +348,54 @@ function paint_board(canvas, state: State, hovered: Coord) {
 
       const index = y * board[y].length + x;
       const is_volatile = volatiles[index];
-      ctx.fillStyle = cell_color(state, {x, y}, is_volatile);
+      const fillStyle = cell_color(state, { x, y }, is_volatile);
 
-      if (board_at(board, {x, y}) === null) {
-        const radius = 0.25 * cell_size;
-        ctx.beginPath();
-        ctx.arc(center_x, center_y, radius, 0, 2 * Math.PI, false);
-        ctx.fill();
+      if (board_at(board, { x, y }) === null) {
+        const radius = 0.2 * cell_size;
+        commands.push({
+          center: [center_x, center_y],
+          fillStyle,
+          kind: "circle",
+          radius,
+        });
       } else {
         const hw = 0.42 * cell_size;
         const left = center_x - hw;
         const top = center_y - hw;
         const right = center_x + hw;
         const bottom = center_y + hw;
-        rounded_rect(ctx, left, top, 2 * hw, 2 * hw, 0.45 * hw).fill();
+        commands.push({
+          fillStyle,
+          kind: "rounded_rect",
+          pos: [left, top],
+          radius: 0.45 * hw,
+          size: [2 * hw, 2 * hw],
+        });
       }
 
       const PAINT_INFLUENCE_CIRCLES = false;
       if (board[y][x] === null && PAINT_INFLUENCE_CIRCLES) {
         for (let dy = -1; dy <= +1; ++dy) {
           for (let dx = -1; dx <= +1; ++dx) {
-            if (dx === 0 && dy === 0) { continue; }
-            const neighbor_coord = {x: x + dx, y: y + dy};
+            if (dx === 0 && dy === 0) {
+              continue;
+            }
+            const neighbor_coord = { x: x + dx, y: y + dy };
             const neightbor_val = board_at(board, neighbor_coord);
             if (neightbor_val !== null) {
               let color = player_color(neightbor_val);
               color += "80"; // Transparent
 
-              const f = 0.40 / Math.sqrt(dx * dx + dy * dy);
+              const f = 0.4 / Math.sqrt(dx * dx + dy * dy);
               const cx = (x + dx * f + 0.5) * cell_size;
               const cy = (y + dy * f + 0.5) * cell_size;
 
-              const radius = 3;
-              ctx.beginPath();
-              ctx.arc(cx, cy, radius, 0, 2 * Math.PI, false);
-              ctx.fillStyle = color;
-              ctx.fill();
+              commands.push({
+                center: [cx, cy],
+                fillStyle: color,
+                kind: "circle",
+                radius: 3,
+              });
             }
           }
         }
@@ -284,49 +405,105 @@ function paint_board(canvas, state: State, hovered: Coord) {
 
   // Columns: A, B, C, D, ...
   for (let x = 0; x < board[0].length; ++x) {
-    ctx.fillStyle = "white";
-    ctx.textAlign = "center";
-    ctx.fillText(`${column_name(x)}`, (x + 0.5) * cell_size, board.length * cell_size + 16);
-    ctx.textAlign = "start";
+    commands.push({
+      fillStyle: "white",
+      font: "14px Palatino",
+      kind: "text",
+      pos: [(x + 0.5) * cell_size, board.length * cell_size + 16],
+      text: `${column_name(x)}`,
+      textAlign: "center",
+    });
   }
 
   // Rows: 1, 2, 3, ...
   for (let y = 0; y < board[0].length; ++y) {
-    ctx.fillStyle = "white";
-    ctx.textAlign = "center";
-    ctx.fillText(`${row_name(y)}`, board[0].length * cell_size + 12, (y + 0.5) * cell_size + 8);
-    ctx.textAlign = "start";
+    commands.push({
+      fillStyle: "white",
+      font: "14px Palatino",
+      kind: "text",
+      pos: [board[0].length * cell_size + 12, (y + 0.5) * cell_size + 8],
+      text: `${row_name(y)}`,
+      textAlign: "center",
+    });
   }
+
+  const text_cmd = {
+    fillStyle: "white",
+    font: "24px Palatino",
+    kind: "text",
+    pos: [12, board.length * cell_size + 64],
+    text: "",
+    textAlign: "start",
+  };
+
+  const paint_text = (fillStyle, text, x, y) => {
+    commands.push({
+      fillStyle,
+      font: "24px Palatino",
+      kind: "text",
+      pos: [x, y],
+      text,
+      textAlign: "start",
+    });
+  };
 
   {
     const LINES_SPACING = 32;
 
     let y = board.length * cell_size + 64;
     if (is_game_over(state)) {
-      ctx.fillStyle = "white";
-      ctx.fillText(`GAME OVER`, 12, y);
+      paint_text("white", "GAME OVER", 12, y);
     } else {
-      ctx.fillStyle = player_color(state.next_player);
-      ctx.fillText(`${player_name(state, state.next_player)} to play`, 12, y);
+      paint_text(
+        player_color(state.next_player),
+        `${player_name(state, state.next_player)} to play`,
+        12,
+        y,
+      );
     }
     y += 1.5 * LINES_SPACING;
 
-    ctx.fillStyle = "white";
-    ctx.fillText(`Standings:`, 12, y);
+    paint_text("white", "Standings:", 12, y);
     y += LINES_SPACING;
 
     const score = get_score(state);
     for (let pi = 0; pi < num_players(state); ++pi) {
-      ctx.fillStyle = player_color(pi);
-      ctx.fillText(`${player_name(state, pi)}`, 12, y);
-      ctx.textAlign = "end";
-      ctx.fillText(`${score[pi]}`, 200, y);
-      ctx.textAlign = "start";
+      commands.push({
+        fillStyle: player_color(pi),
+        font: "24px Palatino",
+        kind: "text",
+        pos: [24, y],
+        text: `${player_name(state, pi)}`,
+        textAlign: "start",
+      });
+      commands.push({
+        fillStyle: player_color(pi),
+        font: "24px Palatino",
+        kind: "text",
+        pos: [200, y],
+        text: `${score[pi]}`,
+        textAlign: "end",
+      });
       y += LINES_SPACING;
     }
-    ctx.fillStyle = "white";
+  }
+
+  return commands;
+}
+
+function paint_board(canvas, state: State, hovered: Coord) {
+  if (hovered !== null) {
+    state = make_move(state, hovered, state.next_player) || state; // PREVIEW!
+  }
+
+  const commands = paint_board_commands(state);
+
+  for (const cmd of commands) {
+    paintCommand(canvas, cmd);
   }
 }
+
+// ----------------------------------------------------------------------------
 
 function get_mouse_pos(canvas, evt): Coord {
   const rect = canvas.getBoundingClientRect();
@@ -345,12 +522,16 @@ function array(n, value_maker) {
 }
 
 function make_board(n: number): Board {
-  return array(n, (_) => array(n, (__) => null));
+  return array(n, _ => array(n, __ => null));
 }
 
 function is_board_at(board: Board, coord: Coord): boolean {
-  if (coord.x < 0 || board[0].length <= coord.x) { return false; }
-  if (coord.y < 0 || board.length <= coord.y) { return false; }
+  if (coord.x < 0 || board[0].length <= coord.x) {
+    return false;
+  }
+  if (coord.y < 0 || board.length <= coord.y) {
+    return false;
+  }
   return true;
 }
 
@@ -359,11 +540,13 @@ function board_at(board: Board, coord: Coord): Player | null {
 }
 
 function influences_at(state: State, coord: Coord): number[] {
-  const influences = array(num_players(state), (_) => 0);
+  const influences = array(num_players(state), _ => 0);
   for (let dy = -1; dy <= +1; ++dy) {
     for (let dx = -1; dx <= +1; ++dx) {
-      if (dx === 0 && dy === 0) { continue; }
-      const neighbor_coord = {x: coord.x + dx, y: coord.y + dy};
+      if (dx === 0 && dy === 0) {
+        continue;
+      }
+      const neighbor_coord = { x: coord.x + dx, y: coord.y + dy };
       const neightbor_val = board_at(state.board, neighbor_coord);
       if (neightbor_val !== null) {
         influences[neightbor_val] += 1;
@@ -397,11 +580,11 @@ function claimed_by(state: State, coord: Coord): Player | null {
 }
 
 function get_score(state: State): number[] {
-  const score = array(num_players(state), (_) => 0);
+  const score = array(num_players(state), _ => 0);
   const board = state.board;
   for (let y = 0; y < board.length; ++y) {
     for (let x = 0; x < board[y].length; ++x) {
-      const claimer = claimed_by(state, {x, y});
+      const claimer = claimed_by(state, { x, y });
       if (claimer !== null) {
         score[claimer] += 1;
       }
@@ -413,10 +596,18 @@ function get_score(state: State): number[] {
 
 function is_valid_move(state: State, coord: Coord, player: Player): boolean {
   const board = state.board;
-  if (coord === null) { return false; }
-  if (coord.x < 0 || board[0].length <= coord.x) { return false; }
-  if (coord.y < 0 || board.length <= coord.y) { return false; }
-  if (board[coord.y][coord.x] !== null) { return false; }
+  if (coord === null) {
+    return false;
+  }
+  if (coord.x < 0 || board[0].length <= coord.x) {
+    return false;
+  }
+  if (coord.y < 0 || board.length <= coord.y) {
+    return false;
+  }
+  if (board[coord.y][coord.x] !== null) {
+    return false;
+  }
 
   const influences = influences_at(state, coord);
   for (let i = 0; i < num_players(state); ++i) {
@@ -432,7 +623,7 @@ function clone(obj) {
 }
 
 function make_move(state: State, coord: Coord, player: Player): State | null {
-  const is_pass = (coord.x === -1 && coord.y === -1);
+  const is_pass = coord.x === -1 && coord.y === -1;
   if (!is_pass && !is_valid_move(state, coord, player)) {
     return null;
   }
@@ -484,34 +675,49 @@ function set_new_state(state: State) {
 }
 
 function start_game() {
-  g_canvas.addEventListener("mousemove", (evt) => {
-    const mouse_pos = get_mouse_pos(g_canvas, evt);
-    const hovered = hovered_cell(g_state.board, mouse_pos);
-    paint_board(g_canvas, g_state, hovered);
-  }, false);
+  g_canvas.addEventListener(
+    "mousemove",
+    evt => {
+      const mouse_pos = get_mouse_pos(g_canvas, evt);
+      const hovered = hovered_cell(g_state.board, mouse_pos);
+      paint_board(g_canvas, g_state, hovered);
+    },
+    false,
+  );
 
-  g_canvas.addEventListener("mousedown", (evt) => {
-    const mouse_pos = get_mouse_pos(g_canvas, evt);
-    const hovered = hovered_cell(g_state.board, mouse_pos);
-    save_undo_point();
-    try_make_move(hovered);
-  }, false);
+  g_canvas.addEventListener(
+    "mousedown",
+    evt => {
+      const mouse_pos = get_mouse_pos(g_canvas, evt);
+      const hovered = hovered_cell(g_state.board, mouse_pos);
+      save_undo_point();
+      try_make_move(hovered);
+    },
+    false,
+  );
 
   paint_board(g_canvas, g_state, null);
 }
 
 function try_make_move(coord: Coord) {
-    const new_state = make_move(g_state, coord, g_state.next_player);
-    if (new_state) {
-      set_new_state(new_state);
-    } else {
-      console.error(`Cannot make move at ${coord_name(coord)} for player ${player_name(g_state, g_state.next_player)}`);
-    }
+  const new_state = make_move(g_state, coord, g_state.next_player);
+  if (new_state) {
+    set_new_state(new_state);
+  } else {
+    console.error(
+      `Cannot make move at ${coord_name(coord)} for player ${player_name(
+        g_state,
+        g_state.next_player,
+      )}`,
+    );
+  }
 }
 
 function make_ai_move() {
   const coord = ai_move(g_state);
-  console.info(`AI ${player_name(g_state, g_state.next_player)}: ${coord_name(coord)}`);
+  console.info(
+    `AI ${player_name(g_state, g_state.next_player)}: ${coord_name(coord)}`,
+  );
   try_make_move(coord);
   paint_board(g_canvas, g_state, null);
 }
@@ -550,7 +756,9 @@ export function new_game(settings: Settings) {
 }
 
 export function undo() {
-  if (g_undo_stack.length === 0) { return; }
+  if (g_undo_stack.length === 0) {
+    return;
+  }
   g_state = g_undo_stack.pop();
   paint_board(g_canvas, g_state, null);
 }
