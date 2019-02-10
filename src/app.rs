@@ -61,6 +61,10 @@ impl App {
         gui.add(label!("Hobogo: A new board game").text_style(TextStyle::Heading));
         self.show_settings(gui);
 
+        gui.vertical(Align::Center, |gui| {
+            self.state.show_whos_next(gui);
+        });
+
         let cmds = self.show_board_and_interact(gui);
         gui.add_graphic(GuiCmd::PaintCommands(cmds));
 
@@ -81,10 +85,12 @@ impl App {
 
     fn show_settings(&mut self, gui: &mut Region) {
         let mut settings = self.state.settings;
-        gui.add(Slider::i32(&mut settings.board_size, 5, 17).text("Board size"));
-        gui.add(Slider::i32(&mut settings.num_humans, 0, 4).text("Human players"));
-        gui.add(Slider::i32(&mut settings.num_bots, 0, 4).text("Bots"));
-        gui.add(Checkbox::new(&mut settings.humans_first, "Humans go first"));
+        gui.columns(2, |cols| {
+            cols[0].add(Slider::i32(&mut settings.num_humans, 0, 4).text("Humans"));
+            cols[0].add(Slider::i32(&mut settings.num_bots, 0, 4).text("Bots"));
+            cols[1].add(Slider::i32(&mut settings.board_size, 5, 17).text("Size"));
+            cols[1].add(Checkbox::new(&mut settings.humans_first, "Humans go first"));
+        });
         if settings != self.state.settings {
             if !self.state.board.is_empty() {
                 self.undo_stack.push_back(self.state.clone());
@@ -139,7 +145,7 @@ impl App {
 }
 
 impl State {
-    pub fn show_standings(&mut self, gui: &mut Region) {
+    pub fn show_whos_next(&mut self, gui: &mut Region) {
         if self.board.is_game_over(self.num_players()) {
             gui.add(label!("Game over!"));
         } else {
@@ -151,7 +157,9 @@ impl State {
                 gui.add(label!("{} is thinking...", player_name).text_color(player_color));
             }
         }
+    }
 
+    pub fn show_standings(&mut self, gui: &mut Region) {
         gui.add(label!("Standings:"));
         gui.indent(|gui| {
             gui.columns(2, |cols| {
@@ -296,9 +304,9 @@ impl State {
 
 fn player_color(player: Player) -> Color {
     match player {
-        0 => srgba(085, 119, 255, 255),
+        0 => srgba(85, 119, 255, 255),
         1 => srgba(205, 0, 0, 255),
-        2 => srgba(000, 255, 0, 255),
+        2 => srgba(0, 255, 0, 255),
         _ => srgba(221, 221, 0, 255),
     }
 }

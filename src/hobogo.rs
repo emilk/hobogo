@@ -193,7 +193,7 @@ impl Board {
             }
         }
 
-        return true;
+        true
     }
 
     pub fn tally_neighbors(&self, c: Coord) -> ([u8; MAX_PLAYERS], u8) {
@@ -336,8 +336,8 @@ impl Board {
                 return Influence::Claimed(player as Player);
             }
         }
-        // TODO: returned which players are tied!!
-        return Influence::Tied;
+        // TODO: return which players are tied
+        Influence::Tied
     }
 
     fn more_than_one_player_has_valid_move(&self, num_players: usize) -> bool {
@@ -466,7 +466,7 @@ impl Board {
 
         let state = mcts::GameState {
             next_player: player,
-            num_players: num_players,
+            num_players,
             board: self.clone(),
         };
 
