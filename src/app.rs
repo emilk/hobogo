@@ -62,17 +62,19 @@ impl App {
         let cmds = self.show_board_and_interact(gui);
         gui.add_graphic(GuiCmd::PaintCommands(cmds));
 
-        self.state.show_gui(gui);
-
-        if gui.add(Button::new("New Game")).clicked {
-            if !self.state.board.is_empty() {
-                self.undo_stack.push_back(self.state.clone());
+        gui.columns(2, |cols| {
+            if cols[0].add(Button::new("New Game")).clicked {
+                if !self.state.board.is_empty() {
+                    self.undo_stack.push_back(self.state.clone());
+                }
+                self.state = State::new(self.state.settings);
             }
-            self.state = State::new(self.state.settings);
-        }
-        if !self.undo_stack.is_empty() && gui.add(Button::new("Undo")).clicked {
-            self.state = self.undo_stack.pop_back().unwrap();
-        }
+            if !self.undo_stack.is_empty() && cols[0].add(Button::new("Undo")).clicked {
+                self.state = self.undo_stack.pop_back().unwrap();
+            }
+
+            self.state.show_standings(&mut cols[1]);
+        });
     }
 
     fn show_settings(&mut self, gui: &mut Region) {
@@ -90,7 +92,8 @@ impl App {
 
     fn show_board_and_interact(&mut self, gui: &mut Region) -> Vec<PaintCmd> {
         let board_id = gui.make_child_id(&"board");
-        let board_interact = gui.reserve_space(vec2(gui.width(), gui.width()), Some(board_id));
+        let size = gui.width() - 32.0; // Leave space for row numbers
+        let board_interact = gui.reserve_space(vec2(size, size), Some(board_id));
         let rect = board_interact.rect;
 
         // HACK: Add some spacing for the column names
@@ -99,22 +102,24 @@ impl App {
         let state = &mut self.state;
 
         if state.next_player_is_human() {
-            if let Some(mouse_pos) = gui.input().mouse_pos {
-                if let Some(hovered_coord) = hovered_coord(&state.board, &rect, mouse_pos) {
-                    if state.board.is_valid_move(
-                        hovered_coord,
-                        state.next_player,
-                        state.num_players(),
-                    ) {
-                        if board_interact.clicked {
-                            self.undo_stack.push_back(state.clone());
-                            state.board[hovered_coord] = Some(state.next_player);
-                            state.next_player =
-                                (state.next_player + 1) % (state.num_players() as u8);
-                        } else {
-                            let mut preview = state.clone();
-                            preview.board[hovered_coord] = Some(state.next_player);
-                            return preview.show_board(rect, gui);
+            if board_interact.hovered {
+                if let Some(mouse_pos) = gui.input().mouse_pos {
+                    if let Some(hovered_coord) = hovered_coord(&state.board, &rect, mouse_pos) {
+                        if state.board.is_valid_move(
+                            hovered_coord,
+                            state.next_player,
+                            state.num_players(),
+                        ) {
+                            if board_interact.clicked {
+                                self.undo_stack.push_back(state.clone());
+                                state.board[hovered_coord] = Some(state.next_player);
+                                state.next_player =
+                                    (state.next_player + 1) % (state.num_players() as u8);
+                            } else {
+                                let mut preview = state.clone();
+                                preview.board[hovered_coord] = Some(state.next_player);
+                                return preview.show_board(rect, gui);
+                            }
                         }
                     }
                 }
@@ -131,9 +136,7 @@ impl App {
 }
 
 impl State {
-    pub fn show_gui(&mut self, gui: &mut Region) {
-        let mut gui = gui.centered_column(200.0, Align::Min);
-
+    pub fn show_standings(&mut self, gui: &mut Region) {
         if self.board.is_game_over(self.num_players()) {
             gui.add(label!("Game over!"));
         } else {
@@ -218,6 +221,8 @@ impl State {
             }
         }
 
+        let color = srgba(100, 100, 100, 255);
+
         // Name chess column names:
         for x in 0..board.width {
             gui.floating_text(
@@ -225,7 +230,7 @@ impl State {
                 &column_name(x),
                 TextStyle::Body,
                 (Align::Center, Align::Min),
-                Some(Color::WHITE),
+                Some(color),
             );
         }
 
@@ -236,7 +241,7 @@ impl State {
                 &row_name(y),
                 TextStyle::Body,
                 (Align::Min, Align::Center),
-                Some(Color::WHITE),
+                Some(color),
             );
         }
 
