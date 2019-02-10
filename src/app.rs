@@ -32,10 +32,15 @@ pub struct State {
 
 impl State {
     fn new(settings: Settings) -> Self {
+        let first_player = if settings.humans_first {
+            0
+        } else {
+            settings.num_humans as Player
+        };
         State {
             settings,
             board: Board::new(settings.board_size, settings.board_size),
-            next_player: 0,
+            next_player: first_player,
         }
     }
 }
@@ -179,11 +184,7 @@ impl State {
     }
 
     fn is_human(&self, player: Player) -> bool {
-        if self.settings.humans_first {
-            (player as i32) < self.settings.num_humans
-        } else {
-            (player as i32) >= self.settings.num_bots
-        }
+        (player as i32) < self.settings.num_humans
     }
 
     fn next_player_is_human(&self) -> bool {
