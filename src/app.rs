@@ -94,7 +94,9 @@ impl App {
             cols[0].add(Slider::i32(&mut settings.num_humans, 0, 4).text("Humans"));
             cols[0].add(Slider::i32(&mut settings.num_bots, 0, 4).text("Bots"));
             cols[1].add(Slider::i32(&mut settings.board_size, 5, 17).text("Size"));
-            cols[1].add(Checkbox::new(&mut settings.humans_first, "Humans go first"));
+            cols[1]
+                .add(Checkbox::new(&mut settings.humans_first, "Humans go first"))
+                .tooltip_text("Going first is a big advantage");
         });
         if settings != self.state.settings {
             if !self.state.board.is_empty() {
@@ -139,10 +141,15 @@ impl App {
                 }
             }
         } else {
-            if let Some(coord) = state.board.ai_move(state.next_player, state.num_players()) {
-                state.board[coord] = Some(state.next_player);
+            if gui.data().any_active() {
+                // Don't do anything slow while the user is e.g. dragging a slider
+            } else {
+                // This is slow. TODO: run in background thread... when wasm supports it.
+                if let Some(coord) = state.board.ai_move(state.next_player, state.num_players()) {
+                    state.board[coord] = Some(state.next_player);
+                }
+                state.next_player = (state.next_player + 1) % (state.num_players() as u8);
             }
-            state.next_player = (state.next_player + 1) % (state.num_players() as u8);
         }
 
         state.show_board(rect, gui)
