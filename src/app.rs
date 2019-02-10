@@ -197,6 +197,20 @@ impl State {
         let volatile = board.volatile_cells(self.num_players());
 
         let mut cmds = vec![];
+
+        if self.next_player_is_human() {
+            // Highlight who is to play next
+            cmds.push(PaintCmd::Rect {
+                corner_radius: 16.0,
+                fill_color: None,
+                outline: Some(Outline {
+                    width: 2.0,
+                    color: player_color(self.next_player),
+                }),
+                rect,
+            });
+        }
+
         for c in board.coords() {
             let center = rect.pos + spacing * vec2(c.x as f32 + 0.5, c.y as f32 + 0.5);
 

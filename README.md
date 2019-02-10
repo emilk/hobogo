@@ -16,7 +16,6 @@ The AI is doing blind Monte Carlo Tree Search for one second.
 
 ## TODO:
 * Highlight last move
-* Current player color
 * Detect game over there are no more volatile cells (cells that can change color)
 * Detect player not being able to make a move (add PASS button, or auto-pass)
 * Humans not always first
