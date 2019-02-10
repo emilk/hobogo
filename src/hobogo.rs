@@ -2,6 +2,8 @@ use std::fmt;
 
 use web_sys;
 
+use crate::mcts;
+
 fn console_log(s: String) {
     web_sys::console::log_1(&s.into());
 }
@@ -10,7 +12,7 @@ const MAX_PLAYERS: usize = 8;
 
 pub type Player = u8;
 
-type Cell = Option<Player>;
+pub type Cell = Option<Player>;
 
 fn player_from_i8(x: i8) -> Cell {
     if x < 0 {
@@ -25,7 +27,8 @@ pub enum Influence {
     // This player occupies this cell
     Occupied(Player),
 
-    // This player has so much influence that noone else can ever occupy this cell
+    // This player has so much influence that noone else can ever occupy this cell.
+    // TODO: remove now that we have volatile_cells
     Ruled(Player),
 
     // The given player is currently the most influential here,
@@ -37,7 +40,7 @@ pub enum Influence {
 }
 
 impl Influence {
-    fn player(&self) -> Option<Player> {
+    pub fn player(&self) -> Option<Player> {
         match self {
             Influence::Occupied(player) => Some(*player),
             Influence::Ruled(player) => Some(*player),
@@ -115,11 +118,37 @@ impl Iterator for Neighbors {
 #[derive(Clone)]
 pub struct Board {
     cells: Vec<Cell>,
-    width: i32,
-    height: i32,
+    pub width: i32,
+    pub height: i32,
+}
+
+impl std::ops::Index<Coord> for Board {
+    type Output = Cell;
+    fn index(&self, c: Coord) -> &Cell {
+        &self.cells[self.index(c).unwrap()]
+    }
+}
+
+impl std::ops::IndexMut<Coord> for Board {
+    fn index_mut(&mut self, c: Coord) -> &mut Cell {
+        let index = self.index(c).unwrap();
+        &mut self.cells[index]
+    }
 }
 
 impl Board {
+    pub fn new(width: i32, height: i32) -> Board {
+        Board {
+            width,
+            height,
+            cells: vec![None; (width * height) as usize],
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        !self.cells.iter().any(|c| c.is_some())
+    }
+
     pub fn contains(&self, c: Coord) -> bool {
         0 <= c.x && c.x < self.width && 0 <= c.y && c.y < self.height
     }
@@ -371,7 +400,7 @@ impl Board {
         most_points > second_most_points + contested
     }
 
-    pub fn game_over(&self, num_players: usize) -> bool {
+    pub fn is_game_over(&self, num_players: usize) -> bool {
         !self.more_than_one_player_has_valid_move(num_players)
             || self.everything_is_ruled_by_someone()
             || self.one_player_has_unbeatable_lead()
@@ -412,7 +441,7 @@ impl Board {
     // }
 
     // pub fn winner(&self, num_players: usize) -> Option<Player> {
-    //     if self.game_over(num_players) {
+    //     if self.is_game_over(num_players) {
     //         self.leader()
     //     } else {
     //         None
@@ -421,16 +450,6 @@ impl Board {
 }
 
 impl Board {
-    pub fn from_js(board: &[i8]) -> Self {
-        let n = (board.len() as f64).sqrt().round() as i32;
-        assert_eq!(n * n, board.len() as i32);
-        Board {
-            cells: board.iter().cloned().map(player_from_i8).collect(),
-            width: n,
-            height: n,
-        }
-    }
-
     pub fn ai_move(&self, player: Player, num_players: usize) -> Option<Coord> {
         fn now_sec() -> f64 {
             web_sys::window()
@@ -441,7 +460,6 @@ impl Board {
                 / 1000.0
         }
 
-        use mcts;
         use rand::SeedableRng;
         let mut rng = rand::rngs::OsRng::new().unwrap();
         let mut rng = rand::rngs::SmallRng::from_rng(&mut rng).unwrap(); // Fast

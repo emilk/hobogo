@@ -4,22 +4,22 @@ set -eu
 # Pre-requisites:
 rustup target add wasm32-unknown-unknown
 if ! [[ $(wasm-bindgen --version) ]]; then
-    cargo install wasm-bindgen-cli
+	cargo clean
+	cargo install -f wasm-bindgen-cli
+	cargo update
 fi
 
 BUILD=debug
 # BUILD=release
 
+# Clear output from old stuff:
+rm -rf docs/*.wasm
+
 echo "Build rust:"
 cargo build --target wasm32-unknown-unknown
 
-echo "Lint and clean up typescript:"
-tslint --fix docs/*.ts
-
-echo "Compile typescript:"
-tsc
-
 echo "Generate JS bindings for wasm:"
-wasm-bindgen target/wasm32-unknown-unknown/"$BUILD"/hobogo.wasm \
-  --out-dir docs --no-modules
-  # --no-modules-global hoboho
+FOLDER_NAME=${PWD##*/}
+TARGET_NAME="${FOLDER_NAME}.wasm"
+wasm-bindgen "target/wasm32-unknown-unknown/$BUILD/$TARGET_NAME" \
+  --out-dir docs --no-modules --no-typescript

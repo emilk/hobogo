@@ -3,7 +3,7 @@ use std::fmt;
 
 use rand::{seq::SliceRandom, Rng};
 
-use hobogo::{Board, Coord, Influence, Player};
+use crate::hobogo::{Board, Coord, Influence, Player};
 
 // ----------------------------------------------------------------------------
 
@@ -47,7 +47,7 @@ impl GameState {
     fn available_actions_for(&self, player: Player) -> Vec<Action> {
         let available_moves = self.available_moves_for(player);
         if available_moves.is_empty() {
-            if self.board.game_over(self.num_players) {
+            if self.board.is_game_over(self.num_players) {
                 vec![]
             } else {
                 vec![Action::Pass]
@@ -77,7 +77,7 @@ impl GameState {
                     return Some(Action::Move(coord));
                 }
             }
-            if self.board.game_over(self.num_players) {
+            if self.board.is_game_over(self.num_players) {
                 None
             } else {
                 Some(Action::Pass)
@@ -171,7 +171,7 @@ impl GameState {
                 let moves = &mut player_moves[next_player as usize];
                 if let Some(coord) = self.next_move_from_deque(moves, next_player) {
                     self.take_action(&Action::Move(coord));
-                } else if self.board.game_over(self.num_players) {
+                } else if self.board.is_game_over(self.num_players) {
                     break;
                 } else {
                     self.take_action(&Action::Pass);

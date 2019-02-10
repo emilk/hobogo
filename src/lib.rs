@@ -1,46 +1,57 @@
-extern crate rand;
+#![deny(warnings)]
+#![allow(dead_code)] // TODO
+
+extern crate serde_json;
 extern crate wasm_bindgen;
-extern crate web_sys;
+
+extern crate emigui;
+extern crate emigui_wasm;
+
+use emigui::{Align, Emigui, RawInput};
 
 use wasm_bindgen::prelude::*;
 
+mod app;
 mod hobogo;
 mod mcts;
 
-use self::hobogo::{Board, Coord, Player};
-
 #[wasm_bindgen]
-extern "C" {
-    fn alert(s: &str);
+pub struct State {
+    app: app::App,
+    emigui: Emigui,
+    webgl_painter: emigui_wasm::webgl::Painter,
 }
 
-#[wasm_bindgen]
-pub struct JsCoord {
-    pub x: i32,
-    pub y: i32,
-}
+impl State {
+    fn new(canvas_id: &str, pixels_per_point: f32) -> Result<State, JsValue> {
+        Ok(State {
+            app: Default::default(),
+            emigui: Emigui::new(pixels_per_point),
+            webgl_painter: emigui_wasm::webgl::Painter::new(canvas_id)?,
+        })
+    }
 
-#[wasm_bindgen]
-pub fn game_over(board: &[i8], num_players: usize) -> bool {
-    Board::from_js(board).game_over(num_players)
-}
+    fn run(&mut self, raw_input: RawInput) -> Result<(), JsValue> {
+        self.emigui.new_frame(raw_input);
 
-#[wasm_bindgen]
-pub fn ai_move(board: &[i8], player: u8, num_players: usize) -> JsCoord {
-    let coord = Board::from_js(board)
-        .ai_move(player as Player, num_players)
-        .unwrap_or(Coord { x: -1, y: -1 });
-    JsCoord {
-        x: coord.x,
-        y: coord.y,
+        let mut region = self.emigui.whole_screen_region();
+        let mut region = region.centered_column(region.width().min(480.0), Align::Min);
+        self.app.show_gui(&mut region);
+
+        let frame = self.emigui.paint();
+        self.webgl_painter
+            .paint(&frame, self.emigui.texture(), raw_input.pixels_per_point)
     }
 }
 
 #[wasm_bindgen]
-pub fn volatile_cells(board: &[i8], num_players: usize) -> Vec<u8> {
-    Board::from_js(board)
-        .volatile_cells(num_players)
-        .into_iter()
-        .map(|ruled| if ruled { 1 } else { 0 })
-        .collect()
+pub fn new_webgl_gui(canvas_id: &str, pixels_per_point: f32) -> Result<State, JsValue> {
+    State::new(canvas_id, pixels_per_point)
+}
+
+#[wasm_bindgen]
+pub fn run_gui(state: &mut State, raw_input_json: &str) -> Result<(), JsValue> {
+    // TODO: nicer interface than JSON
+    let raw_input: RawInput = serde_json::from_str(raw_input_json).unwrap();
+    state.run(raw_input)
 }

@@ -1,15 +1,21 @@
 [package]
 name = "hobogo"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Emil Ernerfeldt <emilernerfeldt@gmail.com>"]
+edition = "2018"
 
 [lib]
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 rand = { version="0.6", features = ['wasm-bindgen'] }
+serde = "1"
+serde_json = "1"
 wasm-bindgen = "0.2"
-web-sys = { version = "0.3.5", features = ['console', 'Performance', 'Window'] }
+web-sys = { version = "0.3", features = ['console', 'Performance', 'Window'] }
+
+emigui = { git = "https://github.com/emilk/emigui" }
+emigui_wasm = { git = "https://github.com/emilk/emigui" }
 
 # Optimize for small code size:
 [profile.dev]
