@@ -7,7 +7,7 @@ export function volatile_cells(arg0: Int8Array, arg1: number): Uint8Array;
 
 export class JsCoord {
 free(): void;
-x: number
-y: number
+x: number;
+y: number;
 
 }
