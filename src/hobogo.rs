@@ -367,10 +367,10 @@ impl Board {
         self.coords()
             .map(|c| self.influence(c))
             .all(|influence| match influence {
-                Influence::Occupied(_) => return true,
-                Influence::Ruled(_) => return true,
-                Influence::Claimed(_) => return false,
-                Influence::Tied => return false,
+                Influence::Occupied(_) => true,
+                Influence::Ruled(_) => true,
+                Influence::Claimed(_) => false,
+                Influence::Tied => false,
             })
     }
 

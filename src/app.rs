@@ -9,6 +9,7 @@ pub struct Settings {
     board_size: i32,
     num_humans: i32,
     num_bots: i32,
+    humans_first: bool,
 }
 
 impl Default for Settings {
@@ -17,6 +18,7 @@ impl Default for Settings {
             board_size: 9,
             num_humans: 1,
             num_bots: 1,
+            humans_first: true,
         }
     }
 }
@@ -82,6 +84,7 @@ impl App {
         gui.add(Slider::i32(&mut settings.board_size, 5, 17).text("Board size"));
         gui.add(Slider::i32(&mut settings.num_humans, 0, 4).text("Human players"));
         gui.add(Slider::i32(&mut settings.num_bots, 0, 4).text("Bots"));
+        gui.add(Checkbox::new(&mut settings.humans_first, "Humans go first"));
         if settings != self.state.settings {
             if !self.state.board.is_empty() {
                 self.undo_stack.push_back(self.state.clone());
@@ -168,7 +171,11 @@ impl State {
     }
 
     fn is_human(&self, player: Player) -> bool {
-        return (player as i32) < self.settings.num_humans;
+        if self.settings.humans_first {
+            (player as i32) < self.settings.num_humans
+        } else {
+            (player as i32) >= self.settings.num_bots
+        }
     }
 
     fn next_player_is_human(&self) -> bool {
