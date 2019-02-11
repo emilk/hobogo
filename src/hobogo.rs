@@ -1,12 +1,8 @@
 use std::fmt;
 
-use web_sys;
+use emigui_wasm::now_sec;
 
 use crate::mcts;
-
-fn console_log(s: String) {
-    web_sys::console::log_1(&s.into());
-}
 
 const MAX_PLAYERS: usize = 8;
 
@@ -115,7 +111,7 @@ impl Iterator for Neighbors {
 
 // ----------------------------------------------------------------------------
 
-#[derive(Clone)]
+#[derive(Clone, Deserialize, Serialize)]
 pub struct Board {
     cells: Vec<Cell>,
     pub width: i32,
@@ -451,15 +447,6 @@ impl Board {
 
 impl Board {
     pub fn ai_move(&self, player: Player, num_players: usize) -> Option<Coord> {
-        fn now_sec() -> f64 {
-            web_sys::window()
-                .expect("should have a Window")
-                .performance()
-                .expect("should have a Performance")
-                .now()
-                / 1000.0
-        }
-
         use rand::SeedableRng;
         let mut rng = rand::rngs::OsRng::new().unwrap();
         let mut rng = rand::rngs::SmallRng::from_rng(&mut rng).unwrap(); // Fast
@@ -478,21 +465,7 @@ impl Board {
             now_sec() - start < think_time
         } {}
 
-        console_log(format!(
-            "{:.1} iterations per second",
-            mcts.num_iterations() as f64 / (now_sec() - start)
-        ));
-        console_log(format!("{}", mcts));
         let action = mcts.best_action().cloned();
-        let action_str = if let Some(action) = action {
-            action.to_string()
-        } else {
-            "[GAME OVER]".to_string()
-        };
-        console_log(format!(
-            "Player {}/{} AI action: {}",
-            player, num_players, action_str
-        ));
 
         if let Some(action) = action {
             match action {

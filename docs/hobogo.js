@@ -175,6 +175,37 @@ __exports.__widl_f_now_Performance = function(arg0) {
     return getObject(arg0).now();
 };
 
+__exports.__widl_f_get_item_Storage = function(ret, arg0, arg1, arg2, exnptr) {
+    let varg1 = getStringFromWasm(arg1, arg2);
+    try {
+        const val = getObject(arg0).getItem(varg1);
+        const retptr = isLikeNone(val) ? [0, 0] : passStringToWasm(val);
+        const retlen = WASM_VECTOR_LEN;
+        const mem = getUint32Memory();
+        mem[ret / 4] = retptr;
+        mem[ret / 4 + 1] = retlen;
+
+    } catch (e) {
+        const view = getUint32Memory();
+        view[exnptr / 4] = 1;
+        view[exnptr / 4 + 1] = addHeapObject(e);
+
+    }
+};
+
+__exports.__widl_f_set_item_Storage = function(arg0, arg1, arg2, arg3, arg4, exnptr) {
+    let varg1 = getStringFromWasm(arg1, arg2);
+    let varg3 = getStringFromWasm(arg3, arg4);
+    try {
+        getObject(arg0).setItem(varg1, varg3);
+    } catch (e) {
+        const view = getUint32Memory();
+        view[exnptr / 4] = 1;
+        view[exnptr / 4 + 1] = addHeapObject(e);
+
+    }
+};
+
 __exports.__widl_instanceof_WebGLRenderingContext = function(idx) {
     return getObject(idx) instanceof WebGLRenderingContext ? 1 : 0;
 };
@@ -359,8 +390,18 @@ __exports.__widl_f_performance_Window = function(arg0) {
 
 };
 
-__exports.__widl_f_log_1_ = function(arg0) {
-    console.log(getObject(arg0));
+__exports.__widl_f_local_storage_Window = function(arg0, exnptr) {
+    try {
+
+        const val = getObject(arg0).localStorage;
+        return isLikeNone(val) ? 0 : addHeapObject(val);
+
+    } catch (e) {
+        const view = getUint32Memory();
+        view[exnptr / 4] = 1;
+        view[exnptr / 4 + 1] = addHeapObject(e);
+
+    }
 };
 
 __exports.__wbg_new_f49b071a6847bcff = function(arg0) {

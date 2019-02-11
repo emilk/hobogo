@@ -4,6 +4,9 @@
 extern crate serde_json;
 extern crate wasm_bindgen;
 
+#[macro_use]
+extern crate serde_derive;
+
 extern crate emigui;
 extern crate emigui_wasm;
 
@@ -25,7 +28,7 @@ pub struct State {
 impl State {
     fn new(canvas_id: &str, pixels_per_point: f32) -> Result<State, JsValue> {
         Ok(State {
-            app: Default::default(),
+            app: app::App::restore_or_new(),
             emigui: Emigui::new(pixels_per_point),
             webgl_painter: emigui_wasm::webgl::Painter::new(canvas_id)?,
         })

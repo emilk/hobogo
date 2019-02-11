@@ -4,7 +4,7 @@ use emigui::{label, math::*, types::*, widgets::*, Align, Region, TextStyle};
 
 use crate::hobogo::{Board, Cell, Coord, Player};
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, Deserialize, PartialEq, Serialize)]
 pub struct Settings {
     board_size: i32,
     num_humans: i32,
@@ -23,7 +23,7 @@ impl Default for Settings {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Deserialize, Serialize)]
 pub struct State {
     settings: Settings,
     board: Board,
@@ -43,11 +43,27 @@ impl State {
             next_player: first_player,
         }
     }
+
+    pub fn from_local_storage() -> Option<Self> {
+        emigui_wasm::local_storage_get("hobogo_state").map(|s| serde_json::from_str(&s).ok())?
+    }
+
+    pub fn save_to_local_storage(&self) -> bool {
+        serde_json::to_string(&self)
+            .map(|s| emigui_wasm::local_storage_set("hobogo_state", &s))
+            .is_ok()
+    }
+
+    pub fn new_or_restore() -> Self {
+        State::from_local_storage().unwrap_or_else(|| State::new(Settings::default()))
+    }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Deserialize, Serialize)]
 pub struct App {
     state: State,
+
+    #[serde(skip_serializing)]
     undo_stack: VecDeque<State>,
 }
 
@@ -62,6 +78,23 @@ impl Default for App {
 }
 
 impl App {
+    pub fn from_local_storage() -> Option<App> {
+        emigui_wasm::local_storage_get("hobogo_state").map(|s| serde_json::from_str(&s).ok())?
+    }
+
+    pub fn save_to_local_storage(&self) -> bool {
+        serde_json::to_string(&self)
+            .map(|s| emigui_wasm::local_storage_set("hobogo_state", &s))
+            .is_ok()
+    }
+
+    pub fn restore_or_new() -> Self {
+        App {
+            state: State::new_or_restore(),
+            undo_stack: Default::default(),
+        }
+    }
+
     pub fn show_gui(&mut self, gui: &mut Region) {
         gui.add(label!("Hobogo: A new board game").text_style(TextStyle::Heading));
         self.show_settings(gui);
@@ -79,11 +112,11 @@ impl App {
                     self.undo_stack.push_back(self.state.clone());
                 }
                 self.state = State::new(self.state.settings);
+                self.state.save_to_local_storage();
             }
             if !self.undo_stack.is_empty() && cols[0].add(Button::new("Undo")).clicked {
                 self.state = self.undo_stack.pop_back().unwrap();
             }
-
             self.state.show_standings(&mut cols[1]);
         });
     }
@@ -103,6 +136,7 @@ impl App {
                 self.undo_stack.push_back(self.state.clone());
             }
             self.state = State::new(settings);
+            self.state.save_to_local_storage();
         }
     }
 
@@ -131,6 +165,7 @@ impl App {
                                 state.board[hovered_coord] = Some(state.next_player);
                                 state.next_player =
                                     (state.next_player + 1) % (state.num_players() as u8);
+                                state.save_to_local_storage();
                             } else {
                                 let mut preview = state.clone();
                                 preview.board[hovered_coord] = Some(state.next_player);
