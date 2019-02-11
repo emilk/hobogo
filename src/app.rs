@@ -151,39 +151,42 @@ impl App {
 
         let state = &mut self.state;
 
-        if state.next_player_is_human() {
-            if board_interact.hovered {
-                if let Some(mouse_pos) = gui.input().mouse_pos {
-                    if let Some(hovered_coord) = hovered_coord(&state.board, &rect, mouse_pos) {
-                        if state.board.is_valid_move(
-                            hovered_coord,
-                            state.next_player,
-                            state.num_players(),
-                        ) {
-                            if board_interact.clicked {
-                                self.undo_stack.push_back(state.clone());
-                                state.board[hovered_coord] = Some(state.next_player);
-                                state.next_player =
-                                    (state.next_player + 1) % (state.num_players() as u8);
-                                state.save_to_local_storage();
-                            } else {
-                                let mut preview = state.clone();
-                                preview.board[hovered_coord] = Some(state.next_player);
-                                return preview.show_board(rect, gui);
+        if !state.board.is_game_over(state.num_players()) {
+            if state.next_player_is_human() {
+                if board_interact.hovered {
+                    if let Some(mouse_pos) = gui.input().mouse_pos {
+                        if let Some(hovered_coord) = hovered_coord(&state.board, &rect, mouse_pos) {
+                            if state.board.is_valid_move(
+                                hovered_coord,
+                                state.next_player,
+                                state.num_players(),
+                            ) {
+                                if board_interact.clicked {
+                                    self.undo_stack.push_back(state.clone());
+                                    state.board[hovered_coord] = Some(state.next_player);
+                                    state.next_player =
+                                        (state.next_player + 1) % (state.num_players() as u8);
+                                    state.save_to_local_storage();
+                                } else {
+                                    let mut preview = state.clone();
+                                    preview.board[hovered_coord] = Some(state.next_player);
+                                    return preview.show_board(rect, gui);
+                                }
                             }
                         }
                     }
                 }
-            }
-        } else {
-            if gui.data().any_active() {
-                // Don't do anything slow while the user is e.g. dragging a slider
             } else {
-                // This is slow. TODO: run in background thread... when wasm supports it.
-                if let Some(coord) = state.board.ai_move(state.next_player, state.num_players()) {
-                    state.board[coord] = Some(state.next_player);
+                if gui.data().any_active() {
+                    // Don't do anything slow while the user is e.g. dragging a slider
+                } else {
+                    // This is slow. TODO: run in background thread... when wasm supports it.
+                    if let Some(coord) = state.board.ai_move(state.next_player, state.num_players())
+                    {
+                        state.board[coord] = Some(state.next_player);
+                    }
+                    state.next_player = (state.next_player + 1) % (state.num_players() as u8);
                 }
-                state.next_player = (state.next_player + 1) % (state.num_players() as u8);
             }
         }
 
@@ -230,7 +233,7 @@ impl State {
     }
 
     fn next_player_is_human(&self) -> bool {
-        self.is_human(self.next_player)
+        self.is_human(self.next_player) && !self.board.is_game_over(self.num_players())
     }
 
     fn player_name(&self, player: Player) -> String {

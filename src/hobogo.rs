@@ -397,9 +397,19 @@ impl Board {
     }
 
     pub fn is_game_over(&self, num_players: usize) -> bool {
-        !self.more_than_one_player_has_valid_move(num_players)
-            || self.everything_is_ruled_by_someone()
-            || self.one_player_has_unbeatable_lead()
+        if !self.more_than_one_player_has_valid_move(num_players) {
+            return true;
+        }
+
+        // if self.everything_is_ruled_by_someone() {
+        //     return true;
+        // }
+        // if self.one_player_has_unbeatable_lead() {
+        //     return true;
+        // }
+
+        let volatiles = self.volatile_cells(num_players);
+        !volatiles.iter().any(|is_volatile| *is_volatile)
     }
 
     /// Given that the game is over, what are the scores?

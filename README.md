@@ -17,7 +17,6 @@ The AI is doing blind Monte Carlo Tree Search for one second.
 ## TODO:
 * Test on iPad
 * Highlight last move by each player
-* Detect game over there are no more volatile cells (cells that can change color)
 * Detect player not being able to make a move (add PASS button, or auto-pass)
 * ABC/123 on every side
 * Better colors
