@@ -23,6 +23,12 @@ impl Default for Settings {
     }
 }
 
+impl Settings {
+    fn num_players(&self) -> usize {
+        (self.num_humans + self.num_bots) as usize
+    }
+}
+
 #[derive(Clone, Deserialize, Serialize)]
 pub struct State {
     settings: Settings,
@@ -32,7 +38,7 @@ pub struct State {
 
 impl State {
     fn new(settings: Settings) -> Self {
-        let first_player = if settings.humans_first {
+        let first_player = if settings.humans_first || settings.num_humans < 0 {
             0
         } else {
             settings.num_humans as Player
@@ -44,8 +50,19 @@ impl State {
         }
     }
 
+    pub fn is_valid(&self) -> bool {
+        self.settings.num_players() >= 2 && (self.next_player as usize) < self.num_players()
+    }
+
     pub fn from_local_storage() -> Option<Self> {
-        emigui_wasm::local_storage_get("hobogo_state").map(|s| serde_json::from_str(&s).ok())?
+        let state: Option<State> = emigui_wasm::local_storage_get("hobogo_state")
+            .map(|s| serde_json::from_str(&s).ok())?;
+        if let Some(state) = state {
+            if state.is_valid() {
+                return Some(state);
+            }
+        }
+        None
     }
 
     pub fn save_to_local_storage(&self) -> bool {
@@ -78,16 +95,6 @@ impl Default for App {
 }
 
 impl App {
-    pub fn from_local_storage() -> Option<App> {
-        emigui_wasm::local_storage_get("hobogo_state").map(|s| serde_json::from_str(&s).ok())?
-    }
-
-    pub fn save_to_local_storage(&self) -> bool {
-        serde_json::to_string(&self)
-            .map(|s| emigui_wasm::local_storage_set("hobogo_state", &s))
-            .is_ok()
-    }
-
     pub fn restore_or_new() -> Self {
         App {
             state: State::new_or_restore(),
@@ -131,6 +138,11 @@ impl App {
                 .add(Checkbox::new(&mut settings.humans_first, "Humans go first"))
                 .tooltip_text("Going first is a big advantage");
         });
+
+        while settings.num_players() < 2 {
+            settings.num_humans += 1;
+        }
+
         if settings != self.state.settings {
             if !self.state.board.is_empty() {
                 self.undo_stack.push_back(self.state.clone());
@@ -225,7 +237,7 @@ impl State {
     }
 
     fn num_players(&self) -> usize {
-        (self.settings.num_humans + self.settings.num_bots) as usize
+        self.settings.num_players()
     }
 
     fn is_human(&self, player: Player) -> bool {

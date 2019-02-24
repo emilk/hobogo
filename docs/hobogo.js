@@ -148,6 +148,12 @@ function getUint32Memory() {
     return cachegetUint32Memory;
 }
 
+function handleError(exnptr, e) {
+    const view = getUint32Memory();
+    view[exnptr / 4] = 1;
+    view[exnptr / 4 + 1] = addHeapObject(e);
+}
+
 __exports.__widl_f_get_context_HTMLCanvasElement = function(arg0, arg1, arg2, exnptr) {
     let varg1 = getStringFromWasm(arg1, arg2);
     try {
@@ -156,10 +162,7 @@ __exports.__widl_f_get_context_HTMLCanvasElement = function(arg0, arg1, arg2, ex
         return isLikeNone(val) ? 0 : addHeapObject(val);
 
     } catch (e) {
-        const view = getUint32Memory();
-        view[exnptr / 4] = 1;
-        view[exnptr / 4 + 1] = addHeapObject(e);
-
+        handleError(exnptr, e);
     }
 };
 
@@ -186,10 +189,7 @@ __exports.__widl_f_get_item_Storage = function(ret, arg0, arg1, arg2, exnptr) {
         mem[ret / 4 + 1] = retlen;
 
     } catch (e) {
-        const view = getUint32Memory();
-        view[exnptr / 4] = 1;
-        view[exnptr / 4 + 1] = addHeapObject(e);
-
+        handleError(exnptr, e);
     }
 };
 
@@ -199,10 +199,7 @@ __exports.__widl_f_set_item_Storage = function(arg0, arg1, arg2, arg3, arg4, exn
     try {
         getObject(arg0).setItem(varg1, varg3);
     } catch (e) {
-        const view = getUint32Memory();
-        view[exnptr / 4] = 1;
-        view[exnptr / 4 + 1] = addHeapObject(e);
-
+        handleError(exnptr, e);
     }
 };
 
@@ -219,10 +216,7 @@ __exports.__widl_f_tex_image_2d_with_i32_and_i32_and_i32_and_format_and_type_and
     try {
         getObject(arg0).texImage2D(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, varg9);
     } catch (e) {
-        const view = getUint32Memory();
-        view[exnptr / 4] = 1;
-        view[exnptr / 4 + 1] = addHeapObject(e);
-
+        handleError(exnptr, e);
     }
 };
 
@@ -397,66 +391,60 @@ __exports.__widl_f_local_storage_Window = function(arg0, exnptr) {
         return isLikeNone(val) ? 0 : addHeapObject(val);
 
     } catch (e) {
-        const view = getUint32Memory();
-        view[exnptr / 4] = 1;
-        view[exnptr / 4 + 1] = addHeapObject(e);
-
+        handleError(exnptr, e);
     }
 };
 
-__exports.__wbg_new_f49b071a6847bcff = function(arg0) {
+__exports.__wbg_new_345214ae0925ade8 = function(arg0) {
     return addHeapObject(new Float32Array(getObject(arg0)));
 };
 
-__exports.__wbg_subarray_f8934b42fec7ca7c = function(arg0, arg1, arg2) {
+__exports.__wbg_subarray_d5aec08a444d8e91 = function(arg0, arg1, arg2) {
     return addHeapObject(getObject(arg0).subarray(arg1, arg2));
 };
 
-__exports.__wbg_newnoargs_43c5f57b77232284 = function(arg0, arg1) {
+__exports.__wbg_newnoargs_4b1bc9d06177648d = function(arg0, arg1) {
     let varg0 = getStringFromWasm(arg0, arg1);
     return addHeapObject(new Function(varg0));
 };
 
-__exports.__wbg_call_7ac13208e630ddeb = function(arg0, arg1, exnptr) {
+__exports.__wbg_call_b1011dd6b074a84c = function(arg0, arg1, exnptr) {
     try {
         return addHeapObject(getObject(arg0).call(getObject(arg1)));
     } catch (e) {
-        const view = getUint32Memory();
-        view[exnptr / 4] = 1;
-        view[exnptr / 4 + 1] = addHeapObject(e);
-
+        handleError(exnptr, e);
     }
 };
 
-__exports.__wbg_new_efed94c530925533 = function(arg0) {
+__exports.__wbg_new_e710c005e20a5502 = function(arg0) {
     return addHeapObject(new Int16Array(getObject(arg0)));
 };
 
-__exports.__wbg_subarray_b6e319a511351c70 = function(arg0, arg1, arg2) {
+__exports.__wbg_subarray_366d07d9310ed71b = function(arg0, arg1, arg2) {
     return addHeapObject(getObject(arg0).subarray(arg1, arg2));
 };
 
-__exports.__wbg_new_a999fd72f5304154 = function(arg0) {
+__exports.__wbg_new_0aee37cce32c00a4 = function(arg0) {
     return addHeapObject(new Uint8Array(getObject(arg0)));
 };
 
-__exports.__wbg_subarray_1cd21da1682e7d1e = function(arg0, arg1, arg2) {
+__exports.__wbg_subarray_7502bca93dbd9b24 = function(arg0, arg1, arg2) {
     return addHeapObject(getObject(arg0).subarray(arg1, arg2));
 };
 
-__exports.__wbg_new_12076896685e5e56 = function(arg0) {
+__exports.__wbg_new_990c4fd6c461bd11 = function(arg0) {
     return addHeapObject(new Uint16Array(getObject(arg0)));
 };
 
-__exports.__wbg_subarray_a860cdd7b04efc31 = function(arg0, arg1, arg2) {
+__exports.__wbg_subarray_99a257973dc8656a = function(arg0, arg1, arg2) {
     return addHeapObject(getObject(arg0).subarray(arg1, arg2));
 };
 
-__exports.__wbg_instanceof_Memory_ed5a1f7b9a0e05a3 = function(idx) {
+__exports.__wbg_instanceof_Memory_06567bb0710f3de7 = function(idx) {
     return getObject(idx) instanceof WebAssembly.Memory ? 1 : 0;
 };
 
-__exports.__wbg_buffer_efdca35786c3eb75 = function(arg0) {
+__exports.__wbg_buffer_4b5b3334b7c8524c = function(arg0) {
     return addHeapObject(getObject(arg0).buffer);
 };
 
@@ -616,7 +604,13 @@ function init(path_or_module) {
 } else {
     const data = fetch(path_or_module);
     if (typeof WebAssembly.instantiateStreaming === 'function') {
-        instantiation = WebAssembly.instantiateStreaming(data, imports);
+        instantiation = WebAssembly.instantiateStreaming(data, imports)
+        .catch(e => {
+            console.warn("`WebAssembly.instantiateStreaming` failed. Assuming this is because your server does not serve wasm with `application/wasm` MIME type. Falling back to `WebAssembly.instantiate` which is slower. Original error:\n", e);
+            return data
+            .then(r => r.arrayBuffer())
+            .then(bytes => WebAssembly.instantiate(bytes, imports));
+        });
     } else {
         instantiation = data
         .then(response => response.arrayBuffer())
