@@ -6,9 +6,9 @@ use crate::hobogo::{Board, Cell, Coord, Player};
 
 #[derive(Clone, Copy, Deserialize, PartialEq, Serialize)]
 pub struct Settings {
-    board_size: i32,
-    num_humans: i32,
-    num_bots: i32,
+    board_size: usize,
+    num_humans: usize,
+    num_bots: usize,
     humans_first: bool,
 }
 
@@ -38,14 +38,14 @@ pub struct State {
 
 impl State {
     fn new(settings: Settings) -> Self {
-        let first_player = if settings.humans_first || settings.num_humans < 0 {
+        let first_player = if settings.humans_first {
             0
         } else {
             settings.num_humans as Player
         };
         State {
             settings,
-            board: Board::new(settings.board_size, settings.board_size),
+            board: Board::new(settings.board_size as i32, settings.board_size as i32),
             next_player: first_player,
         }
     }
@@ -111,7 +111,7 @@ impl App {
         });
 
         let cmds = self.show_board_and_interact(gui);
-        gui.add_graphic(GuiCmd::PaintCommands(cmds));
+        gui.add_paint_cmds(cmds);
 
         gui.columns(2, |cols| {
             if cols[0].add(Button::new("New Game")).clicked {
@@ -131,9 +131,9 @@ impl App {
     fn show_settings(&mut self, gui: &mut Region) {
         let mut settings = self.state.settings;
         gui.columns(2, |cols| {
-            cols[0].add(Slider::i32(&mut settings.num_humans, 0, 4).text("Humans"));
-            cols[0].add(Slider::i32(&mut settings.num_bots, 0, 4).text("Bots"));
-            cols[1].add(Slider::i32(&mut settings.board_size, 5, 17).text("Size"));
+            cols[0].add(Slider::usize(&mut settings.num_humans, 0, 4).text("Humans"));
+            cols[0].add(Slider::usize(&mut settings.num_bots, 0, 4).text("Bots"));
+            cols[1].add(Slider::usize(&mut settings.board_size, 5, 17).text("Size"));
             cols[1]
                 .add(Checkbox::new(&mut settings.humans_first, "Humans go first"))
                 .tooltip_text("Going first is a big advantage");
@@ -241,7 +241,7 @@ impl State {
     }
 
     fn is_human(&self, player: Player) -> bool {
-        (player as i32) < self.settings.num_humans
+        (player as usize) < self.settings.num_humans
     }
 
     fn next_player_is_human(&self) -> bool {
