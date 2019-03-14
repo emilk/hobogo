@@ -106,18 +106,28 @@ impl GameState {
             }
         }
 
-        assert!(points[winner] >= points[runner_up]);
-        let win_margin = points[winner] - points[runner_up];
+        debug_assert!(points[winner] >= points[runner_up]);
 
-        if win_margin == 0 {
-            // A tie: not good, but better than loosing
-            vec![0.5; self.num_players]
-        } else {
-            let margin_score = (win_margin as f64) / 10.0; // ARBRITRARY
-            let mut score = vec![-margin_score; self.num_players];
-            score[winner] = 1.0 + margin_score;
-            score
-        }
+        let tie = points[winner] == points[runner_up];
+
+        (0..self.num_players)
+            .map(|pi| {
+                let points_behind_winner = points[winner] - points[pi];
+                if points_behind_winner == 0 {
+                    if tie {
+                        // One of several winners
+                        0.5
+                    } else {
+                        // Sole winner
+                        let points_ahead = points[winner] - points[runner_up];
+                        1.0 + (points_ahead as f64) / 10.0 // Try to maximize our win margin
+                    }
+                } else {
+                    // Looser
+                    0.0 - (points_behind_winner as f64) / 10.0 // Try to minimize how far behind winner we get
+                }
+            })
+            .collect()
     }
 
     fn next_move_from_deque(
