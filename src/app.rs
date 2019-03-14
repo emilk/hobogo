@@ -392,11 +392,10 @@ fn hovered_coord(board: &Board, rect: &Rect, mouse_pos: Vec2) -> Option<Coord> {
     for c in board.coords() {
         let x = c.x as f32 * spacing + rect.pos.x;
         let y = c.y as f32 * spacing + rect.pos.y;
-        let pad = 2.0;
-        let left = x + pad;
-        let top = y + pad;
-        let right = x + spacing - pad;
-        let bottom = y + spacing - pad;
+        let left = x;
+        let top = y;
+        let right = x + spacing;
+        let bottom = y + spacing;
         let is_hovering = left <= mouse_pos.x
             && mouse_pos.x <= right
             && top <= mouse_pos.y
