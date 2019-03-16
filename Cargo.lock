@@ -95,7 +95,7 @@ dependencies = [
 [[package]]
 name = "emigui"
 version = "0.1.0"
-source = "git+https://github.com/emilk/emigui#e06a4db7bc0117b7ff916609b7c631a292e7deaa"
+source = "git+https://github.com/emilk/emigui#375cc231a68c12e463f2cd03731e1ab2509ef3ac"
 dependencies = [
  "rusttype 0.7.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.89 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -105,7 +105,7 @@ dependencies = [
 [[package]]
 name = "emigui_wasm"
 version = "0.1.0"
-source = "git+https://github.com/emilk/emigui#e06a4db7bc0117b7ff916609b7c631a292e7deaa"
+source = "git+https://github.com/emilk/emigui#375cc231a68c12e463f2cd03731e1ab2509ef3ac"
 dependencies = [
  "emigui 0.1.0 (git+https://github.com/emilk/emigui)",
  "js-sys 0.3.16 (registry+https://github.com/rust-lang/crates.io-index)",
