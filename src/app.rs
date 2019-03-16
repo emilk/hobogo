@@ -82,16 +82,9 @@ pub struct App {
 
     #[serde(skip_serializing)]
     undo_stack: VecDeque<State>,
-}
 
-impl Default for App {
-    fn default() -> Self {
-        let settings = Settings::default();
-        App {
-            state: State::new(settings),
-            undo_stack: Default::default(),
-        }
-    }
+    #[serde(skip_serializing)]
+    ai_frame_delay: usize,
 }
 
 impl App {
@@ -99,11 +92,14 @@ impl App {
         App {
             state: State::new_or_restore(),
             undo_stack: Default::default(),
+            ai_frame_delay: 0,
         }
     }
 
     pub fn show_gui(&mut self, gui: &mut Region) {
-        gui.add(label!("Hobogo: a board game").text_style(TextStyle::Heading));
+        gui.vertical(Align::Center, |gui| {
+            gui.add(label!("HOBOGO").text_style(TextStyle::Heading));
+        });
         self.show_settings(gui);
 
         gui.vertical(Align::Center, |gui| {
@@ -124,7 +120,7 @@ impl App {
             if !self.undo_stack.is_empty() && cols[0].add(Button::new("Undo")).clicked {
                 self.state = self.undo_stack.pop_back().unwrap();
             }
-            self.state.show_standings(&mut cols[1]);
+            self.state.show_score(&mut cols[1]);
         });
     }
 
@@ -153,6 +149,9 @@ impl App {
     }
 
     fn show_board_and_interact(&mut self, gui: &mut Region) -> Vec<PaintCmd> {
+        // Add spacing before the board:
+        gui.reserve_space(vec2(gui.width(), 8.0), None);
+
         let board_id = gui.make_child_id(&"board");
         let size = gui.width() - 32.0; // Leave space for row numbers
         let board_interact = gui.reserve_space(vec2(size, size), Some(board_id));
@@ -193,11 +192,20 @@ impl App {
                     // Don't do anything slow while the user is e.g. dragging a slider
                 } else {
                     // This is slow. TODO: run in background thread... when wasm supports it.
-                    if let Some(coord) = state.board.ai_move(state.next_player, state.num_players())
-                    {
-                        state.board[coord] = Some(state.next_player);
+
+                    if self.ai_frame_delay < 15 {
+                        // HACK: Give WebGL time to catch up visually
+                        self.ai_frame_delay += 1;
+                    } else {
+                        self.ai_frame_delay = 0;
+
+                        if let Some(coord) =
+                            state.board.ai_move(state.next_player, state.num_players())
+                        {
+                            state.board[coord] = Some(state.next_player);
+                        }
+                        state.next_player = (state.next_player + 1) % (state.num_players() as u8);
                     }
-                    state.next_player = (state.next_player + 1) % (state.num_players() as u8);
                 }
             }
         }
@@ -221,19 +229,38 @@ impl State {
         }
     }
 
-    pub fn show_standings(&mut self, gui: &mut Region) {
-        gui.add(label!("Standings:"));
-        gui.indent(|gui| {
-            gui.columns(2, |cols| {
-                let score = self.board.points();
-                for pi in 0..self.num_players() {
-                    let player_color = player_color(pi as Player);
-                    let player_name = self.player_name(pi as Player);
-                    cols[0].add(label!("{}", player_name).text_color(player_color));
-                    cols[1].add(label!("{}", score[pi]).text_color(player_color));
-                }
-            });
-        });
+    pub fn show_score(&mut self, gui: &mut Region) {
+        // gui.columns(2, |cols| {
+        //     let score = self.board.points();
+        //     for pi in 0..self.num_players() {
+        //         let player_color = player_color(pi as Player);
+        //         let player_name = self.player_name(pi as Player);
+        //         cols[0].add(label!("{}", player_name).text_color(player_color));
+        //         cols[1].add(label!("{}", score[pi]).text_color(player_color));
+        //     }
+        // });
+
+        let score = self.board.points();
+        let mut cursor = gui.cursor();
+        for pi in 0..self.num_players() {
+            let player_color = player_color(pi as Player);
+            let player_name = self.player_name(pi as Player);
+            let text_size = gui.floating_text(
+                cursor + vec2(32.0, 0.0),
+                &player_name,
+                TextStyle::Body,
+                (Align::Min, Align::Min),
+                Some(player_color),
+            );
+            gui.floating_text(
+                vec2(cursor.x, cursor.y),
+                &score[pi].to_string(),
+                TextStyle::Body,
+                (Align::Min, Align::Min),
+                Some(player_color),
+            );
+            cursor.y += text_size.y;
+        }
     }
 
     fn num_players(&self) -> usize {
@@ -250,15 +277,15 @@ impl State {
 
     fn player_name(&self, player: Player) -> String {
         let mut name = match player {
-            0 => "yellow".to_string(),
-            1 => "pink".to_string(),
-            2 => "green".to_string(),
-            3 => "purple".to_string(),
+            0 => "Yellow".to_string(),
+            1 => "Pink".to_string(),
+            2 => "Green".to_string(),
+            3 => "Purple".to_string(),
             i => i.to_string(),
         };
 
         if !self.is_human(player) {
-            name += " (AI)";
+            name += " (bot)";
         }
 
         name
@@ -271,16 +298,19 @@ impl State {
 
         let mut cmds = vec![];
 
+        let cell_side = spacing * 0.84;
+        let corner_radius = (cell_side * 0.25).round();
+
         if self.next_player_is_human() {
             // Highlight who is to play next
             cmds.push(PaintCmd::Rect {
-                corner_radius: 16.0,
+                corner_radius: corner_radius * 2.0f32.sqrt(),
                 fill_color: None,
                 outline: Some(Outline {
                     width: 2.0,
                     color: player_color(self.next_player),
                 }),
-                rect,
+                rect: rect.expand(4.0),
             });
         }
 
@@ -291,12 +321,11 @@ impl State {
             let fill_color = Some(self.cell_color(c, is_volatile));
 
             if let Some(_player) = board[c] {
-                let side = spacing * 0.84;
                 cmds.push(PaintCmd::Rect {
-                    corner_radius: side * 0.35,
+                    corner_radius,
                     fill_color,
                     outline: None,
-                    rect: Rect::from_center_size(center, vec2(side, side)),
+                    rect: Rect::from_center_size(center, vec2(cell_side, cell_side)),
                 });
             } else {
                 cmds.push(PaintCmd::Circle {
@@ -313,7 +342,7 @@ impl State {
         // Name chess column names:
         for x in 0..board.width {
             gui.floating_text(
-                rect.pos + vec2((x as f32 + 0.5) * spacing, rect.height() + 4.0),
+                rect.pos + vec2((x as f32 + 0.5) * spacing, rect.height() + 12.0),
                 &column_name(x),
                 TextStyle::Body,
                 (Align::Center, Align::Min),
@@ -324,7 +353,7 @@ impl State {
         // Name chess row names:
         for y in 0..board.height {
             gui.floating_text(
-                rect.pos + vec2(rect.width() + 4.0, (y as f32 + 0.5) * spacing),
+                rect.pos + vec2(rect.width() + 12.0, (y as f32 + 0.5) * spacing),
                 &row_name(y),
                 TextStyle::Body,
                 (Align::Min, Align::Center),

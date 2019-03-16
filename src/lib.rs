@@ -39,11 +39,11 @@ impl State {
 
         let mut region = self.emigui.whole_screen_region();
         let width = (region.height() - 200.0) * 0.8; // This is a bit ugly
-        let width = width.min(region.width() - 8.0);
+        let width = width.min(region.width() - 22.0);
         let mut region = region.centered_column(width, Align::Min);
         self.app.show_gui(&mut region);
 
-        let bg_color = srgba(13, 5, 43, 255);
+        let bg_color = srgba(13, 8, 31, 255); // TODO: get from CSS?
         let mesh = self.emigui.paint();
         self.webgl_painter.paint(
             bg_color,
