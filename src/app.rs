@@ -2,7 +2,7 @@ use std::collections::VecDeque;
 
 use emigui::{label, math::*, types::*, widgets::*, Align, Region, TextStyle};
 
-use crate::hobogo::{Board, Cell, Coord, Player};
+use crate::hobogo::{Board, Coord, Player};
 
 #[derive(Clone, Copy, Deserialize, PartialEq, Serialize)]
 pub struct Settings {
@@ -103,7 +103,7 @@ impl App {
     }
 
     pub fn show_gui(&mut self, gui: &mut Region) {
-        gui.add(label!("Hobogo: A new board game").text_style(TextStyle::Heading));
+        gui.add(label!("Hobogo: a board game").text_style(TextStyle::Heading));
         self.show_settings(gui);
 
         gui.vertical(Align::Center, |gui| {
@@ -250,10 +250,10 @@ impl State {
 
     fn player_name(&self, player: Player) -> String {
         let mut name = match player {
-            0 => "blue".to_string(),
-            1 => "red".to_string(),
+            0 => "yellow".to_string(),
+            1 => "pink".to_string(),
             2 => "green".to_string(),
-            3 => "yellow".to_string(),
+            3 => "purple".to_string(),
             i => i.to_string(),
         };
 
@@ -308,7 +308,7 @@ impl State {
             }
         }
 
-        let color = srgba(100, 100, 100, 255);
+        let text_color = srgba(100, 100, 100, 255);
 
         // Name chess column names:
         for x in 0..board.width {
@@ -317,7 +317,7 @@ impl State {
                 &column_name(x),
                 TextStyle::Body,
                 (Align::Center, Align::Min),
-                Some(color),
+                Some(text_color),
             );
         }
 
@@ -328,7 +328,7 @@ impl State {
                 &row_name(y),
                 TextStyle::Body,
                 (Align::Min, Align::Center),
-                Some(color),
+                Some(text_color),
             );
         }
 
@@ -351,10 +351,10 @@ impl State {
                     .is_valid_move(c, self.next_player, self.num_players())
             {
                 // The currant human can't move here
-                srgba(85, 85, 85, 255)
+                srgba(70, 70, 100, 255)
             } else {
                 // Free (at least for some)
-                srgba(153, 153, 153, 255)
+                srgba(130, 130, 150, 255)
             }
         }
     }
@@ -362,18 +362,14 @@ impl State {
 
 fn player_color(player: Player) -> Color {
     match player {
-        0 => srgba(85, 119, 255, 255),
-        1 => srgba(205, 0, 0, 255),
-        2 => srgba(0, 255, 0, 255),
-        _ => srgba(221, 221, 0, 255),
-    }
-}
-
-fn cell_color(cell: Cell) -> Color {
-    if let Some(player) = cell {
-        player_color(player)
-    } else {
-        srgba(170, 170, 170, 255)
+        // 0 => srgba(85, 119, 255, 255),
+        // 1 => srgba(205, 0, 0, 255),
+        // 2 => srgba(0, 255, 0, 255),
+        // _ => srgba(221, 221, 0, 255),
+        0 => srgba(239, 169, 0, 255),
+        1 => srgba(242, 73, 117, 255),
+        2 => srgba(31, 187, 171, 255),
+        _ => srgba(121, 68, 219, 255),
     }
 }
 

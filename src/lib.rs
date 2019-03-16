@@ -10,7 +10,7 @@ extern crate serde_derive;
 extern crate emigui;
 extern crate emigui_wasm;
 
-use emigui::{Align, Emigui, RawInput};
+use emigui::{types::srgba, Align, Emigui, RawInput};
 
 use wasm_bindgen::prelude::*;
 
@@ -38,12 +38,19 @@ impl State {
         self.emigui.new_frame(raw_input);
 
         let mut region = self.emigui.whole_screen_region();
-        let mut region = region.centered_column(region.width().min(375.0), Align::Min);
+        let width = (region.height() - 200.0) * 0.8; // This is a bit ugly
+        let width = width.min(region.width() - 8.0);
+        let mut region = region.centered_column(width, Align::Min);
         self.app.show_gui(&mut region);
 
-        let frame = self.emigui.paint();
-        self.webgl_painter
-            .paint(&frame, self.emigui.texture(), raw_input.pixels_per_point)
+        let bg_color = srgba(13, 5, 43, 255);
+        let mesh = self.emigui.paint();
+        self.webgl_painter.paint(
+            bg_color,
+            mesh,
+            self.emigui.texture(),
+            raw_input.pixels_per_point,
+        )
     }
 }
 
