@@ -193,7 +193,7 @@ impl App {
                 } else {
                     // This is slow. TODO: run in background thread... when wasm supports it.
 
-                    if self.ai_frame_delay < 15 {
+                    if self.ai_frame_delay < 6 {
                         // HACK: Give WebGL time to catch up visually
                         self.ai_frame_delay += 1;
                     } else {
@@ -380,10 +380,10 @@ impl State {
                     .is_valid_move(c, self.next_player, self.num_players())
             {
                 // The currant human can't move here
-                srgba(70, 70, 100, 255)
+                srgba(90, 90, 100, 255)
             } else {
                 // Free (at least for some)
-                srgba(130, 130, 150, 255)
+                srgba(150, 150, 160, 255)
             }
         }
     }
