@@ -1,6 +1,8 @@
 use std::collections::VecDeque;
 
-use emigui::{label, math::*, types::*, widgets::*, Align, Region, TextStyle};
+use serde::{Deserialize, Serialize};
+
+use egui::{color::srgba, label, math::*, widgets::*, Align, TextStyle, Ui};
 
 use crate::hobogo::{Board, Coord, Player};
 
@@ -55,8 +57,8 @@ impl State {
     }
 
     pub fn from_local_storage() -> Option<Self> {
-        let state: Option<State> = emigui_wasm::local_storage_get("hobogo_state")
-            .map(|s| serde_json::from_str(&s).ok())?;
+        let state: Option<State> =
+            egui_web::local_storage_get("hobogo_state").map(|s| serde_json::from_str(&s).ok())?;
         if let Some(state) = state {
             if state.is_valid() {
                 return Some(state);
@@ -67,7 +69,7 @@ impl State {
 
     pub fn save_to_local_storage(&self) -> bool {
         serde_json::to_string(&self)
-            .map(|s| emigui_wasm::local_storage_set("hobogo_state", &s))
+            .map(|s| egui_web::local_storage_set("hobogo_state", &s))
             .is_ok()
     }
 
@@ -96,20 +98,22 @@ impl App {
         }
     }
 
-    pub fn show_gui(&mut self, gui: &mut Region) {
-        gui.vertical(Align::Center, |gui| {
-            gui.add(label!("HOBOGO").text_style(TextStyle::Heading));
+    pub fn show_gui(&mut self, ui: &mut Ui) {
+        ui.vertical(|ui| {
+            ui.set_layout(egui::Layout::vertical(Align::Center));
+            ui.add(label!("HOBOGO").text_style(TextStyle::Heading));
         });
-        self.show_settings(gui);
+        self.show_settings(ui);
 
-        gui.vertical(Align::Center, |gui| {
-            self.state.show_whos_next(gui);
+        ui.vertical(|ui| {
+            ui.set_layout(egui::Layout::vertical(Align::Center));
+            self.state.show_whos_next(ui);
         });
 
-        let cmds = self.show_board_and_interact(gui);
-        gui.add_paint_cmds(cmds);
+        let cmds = self.show_board_and_interact(ui);
+        ui.add_paint_cmds(cmds);
 
-        gui.columns(2, |cols| {
+        ui.columns(2, |cols| {
             if cols[0].add(Button::new("New Game")).clicked {
                 if !self.state.board.is_empty() {
                     self.undo_stack.push_back(self.state.clone());
@@ -124,12 +128,12 @@ impl App {
         });
     }
 
-    fn show_settings(&mut self, gui: &mut Region) {
+    fn show_settings(&mut self, ui: &mut Ui) {
         let mut settings = self.state.settings;
-        gui.columns(2, |cols| {
-            cols[0].add(Slider::usize(&mut settings.num_humans, 0, 4).text("Humans"));
-            cols[0].add(Slider::usize(&mut settings.num_bots, 0, 4).text("Bots"));
-            cols[1].add(Slider::usize(&mut settings.board_size, 5, 17).text("Size"));
+        ui.columns(2, |cols| {
+            cols[0].add(Slider::usize(&mut settings.num_humans, 0..=4).text("Humans"));
+            cols[0].add(Slider::usize(&mut settings.num_bots, 0..=4).text("Bots"));
+            cols[1].add(Slider::usize(&mut settings.board_size, 5..=17).text("Size"));
             cols[1]
                 .add(Checkbox::new(&mut settings.humans_first, "Humans go first"))
                 .tooltip_text("Going first is a big advantage");
@@ -148,24 +152,24 @@ impl App {
         }
     }
 
-    fn show_board_and_interact(&mut self, gui: &mut Region) -> Vec<PaintCmd> {
+    fn show_board_and_interact(&mut self, ui: &mut Ui) -> Vec<PaintCmd> {
         // Add spacing before the board:
-        gui.reserve_space(vec2(gui.width(), 8.0), None);
+        ui.allocate_space(vec2(ui.rect().width(), 8.0));
 
-        let board_id = gui.make_child_id(&"board");
-        let size = gui.width() - 32.0; // Leave space for row numbers
-        let board_interact = gui.reserve_space(vec2(size, size), Some(board_id));
-        let rect = board_interact.rect;
+        let board_id = ui.make_child_id(&"board");
+        let size = ui.rect().width() - 32.0; // Leave space for row numbers
+        let rect = ui.allocate_space(vec2(size, size));
+        let board_interact = ui.interact(rect, board_id, egui::Sense::click());
 
         // HACK: Add some spacing for the column names
-        gui.reserve_space(vec2(gui.width(), 32.0), None);
+        ui.allocate_space(vec2(ui.rect().width(), 32.0));
 
         let state = &mut self.state;
 
         if !state.board.is_game_over(state.num_players()) {
             if state.next_player_is_human() {
                 if board_interact.hovered {
-                    if let Some(mouse_pos) = gui.input().mouse_pos {
+                    if let Some(mouse_pos) = ui.input().mouse.pos {
                         if let Some(hovered_coord) = hovered_coord(&state.board, &rect, mouse_pos) {
                             if state.board.is_valid_move(
                                 hovered_coord,
@@ -181,14 +185,14 @@ impl App {
                                 } else {
                                     let mut preview = state.clone();
                                     preview.board[hovered_coord] = Some(state.next_player);
-                                    return preview.show_board(rect, gui);
+                                    return preview.show_board(rect, ui);
                                 }
                             }
                         }
                     }
                 }
             } else {
-                if gui.data().any_active() {
+                if ui.ctx().is_using_mouse() {
                     // Don't do anything slow while the user is e.g. dragging a slider
                 } else {
                     // This is slow. TODO: run in background thread... when wasm supports it.
@@ -207,52 +211,54 @@ impl App {
                         state.next_player = (state.next_player + 1) % (state.num_players() as u8);
                     }
                 }
+                ui.ctx().request_repaint();
             }
         }
 
-        state.show_board(rect, gui)
+        state.show_board(rect, ui)
     }
 }
 
 impl State {
-    pub fn show_whos_next(&mut self, gui: &mut Region) {
+    pub fn show_whos_next(&mut self, ui: &mut Ui) {
         if self.board.is_game_over(self.num_players()) {
-            gui.add(label!("Game over!"));
+            ui.add(label!("Game over!"));
         } else {
             let player_color = player_color(self.next_player);
             let player_name = self.player_name(self.next_player);
             if self.next_player_is_human() {
-                gui.add(label!("{} to play", player_name).text_color(player_color));
+                ui.add(label!("{} to play", player_name).text_color(player_color));
             } else {
-                gui.add(label!("{} is thinking...", player_name).text_color(player_color));
+                ui.add(label!("{} is thinking...", player_name).text_color(player_color));
             }
         }
     }
 
-    pub fn show_score(&mut self, gui: &mut Region) {
-        // gui.columns(2, |cols| {
-        //     let score = self.board.points();
-        //     for pi in 0..self.num_players() {
-        //         let player_color = player_color(pi as Player);
-        //         let player_name = self.player_name(pi as Player);
-        //         cols[0].add(label!("{}", player_name).text_color(player_color));
-        //         cols[1].add(label!("{}", score[pi]).text_color(player_color));
-        //     }
-        // });
+    pub fn show_score(&mut self, ui: &mut Ui) {
+        ui.columns(2, |cols| {
+            let score = self.board.points();
+            for pi in 0..self.num_players() {
+                let player_color = player_color(pi as Player);
+                let player_name = self.player_name(pi as Player);
+                cols[0].add(label!("{}", player_name).text_color(player_color));
+                cols[1].add(label!("{}", score[pi]).text_color(player_color));
+            }
+        });
 
+        /*
         let score = self.board.points();
-        let mut cursor = gui.cursor();
+        let mut cursor = ui.cursor();
         for pi in 0..self.num_players() {
             let player_color = player_color(pi as Player);
             let player_name = self.player_name(pi as Player);
-            let text_size = gui.floating_text(
+            let text_size = ui.floating_text(
                 cursor + vec2(32.0, 0.0),
                 &player_name,
                 TextStyle::Body,
                 (Align::Min, Align::Min),
                 Some(player_color),
             );
-            gui.floating_text(
+            ui.floating_text(
                 vec2(cursor.x, cursor.y),
                 &score[pi].to_string(),
                 TextStyle::Body,
@@ -261,6 +267,7 @@ impl State {
             );
             cursor.y += text_size.y;
         }
+        */
     }
 
     fn num_players(&self) -> usize {
@@ -291,9 +298,9 @@ impl State {
         name
     }
 
-    fn show_board(&self, rect: Rect, gui: &mut Region) -> Vec<PaintCmd> {
+    fn show_board(&self, rect: Rect, ui: &mut Ui) -> Vec<PaintCmd> {
         let board = &self.board;
-        let spacing = rect.size.x / (board.width as f32);
+        let spacing = rect.width() / (board.width as f32);
         let volatile = board.volatile_cells(self.num_players());
 
         let mut cmds = vec![];
@@ -305,8 +312,8 @@ impl State {
             // Highlight who is to play next
             cmds.push(PaintCmd::Rect {
                 corner_radius: corner_radius * 2.0f32.sqrt(),
-                fill_color: None,
-                outline: Some(Outline {
+                fill: None,
+                outline: Some(LineStyle {
                     width: 2.0,
                     color: player_color(self.next_player),
                 }),
@@ -315,22 +322,22 @@ impl State {
         }
 
         for c in board.coords() {
-            let center = rect.pos + spacing * vec2(c.x as f32 + 0.5, c.y as f32 + 0.5);
+            let center = rect.min + spacing * vec2(c.x as f32 + 0.5, c.y as f32 + 0.5);
 
             let is_volatile = volatile[board.index(c).unwrap()];
-            let fill_color = Some(self.cell_color(c, is_volatile));
+            let fill = Some(self.cell_color(c, is_volatile));
 
             if let Some(_player) = board[c] {
                 cmds.push(PaintCmd::Rect {
                     corner_radius,
-                    fill_color,
+                    fill,
                     outline: None,
                     rect: Rect::from_center_size(center, vec2(cell_side, cell_side)),
                 });
             } else {
                 cmds.push(PaintCmd::Circle {
                     center,
-                    fill_color,
+                    fill,
                     outline: None,
                     radius: 0.2 * spacing,
                 });
@@ -341,8 +348,8 @@ impl State {
 
         // Name chess column names:
         for x in 0..board.width {
-            gui.floating_text(
-                rect.pos + vec2((x as f32 + 0.5) * spacing, rect.height() + 12.0),
+            ui.floating_text(
+                rect.min + vec2((x as f32 + 0.5) * spacing, rect.height() + 12.0),
                 &column_name(x),
                 TextStyle::Body,
                 (Align::Center, Align::Min),
@@ -352,8 +359,8 @@ impl State {
 
         // Name chess row names:
         for y in 0..board.height {
-            gui.floating_text(
-                rect.pos + vec2(rect.width() + 12.0, (y as f32 + 0.5) * spacing),
+            ui.floating_text(
+                rect.min + vec2(rect.width() + 12.0, (y as f32 + 0.5) * spacing),
                 &row_name(y),
                 TextStyle::Body,
                 (Align::Min, Align::Center),
@@ -368,23 +375,21 @@ impl State {
         let influence = self.board.influence(c);
         if let Some(claimer) = influence.player() {
             let color = player_color(claimer);
-            if !is_volatile && !influence.is_occupied() {
-                srgba(color.r, color.g, color.b, 127) // Transparent
-            } else {
+            if is_volatile || influence.is_occupied() {
                 color
-            }
-        } else {
-            if self.next_player_is_human()
-                && !self
-                    .board
-                    .is_valid_move(c, self.next_player, self.num_players())
-            {
-                // The currant human can't move here
-                srgba(90, 90, 100, 255)
             } else {
-                // Free (at least for some)
-                srgba(150, 150, 160, 255)
+                srgba(color.r / 2, color.g / 2, color.b / 2, color.a) // Darker
             }
+        } else if self.next_player_is_human()
+            && !self
+                .board
+                .is_valid_move(c, self.next_player, self.num_players())
+        {
+            // The currant human can't move here
+            srgba(90, 90, 100, 255)
+        } else {
+            // Free (at least for some)
+            srgba(150, 150, 160, 255)
         }
     }
 }
@@ -412,11 +417,11 @@ fn row_name(y: i32) -> String {
     y.to_string()
 }
 
-fn hovered_coord(board: &Board, rect: &Rect, mouse_pos: Vec2) -> Option<Coord> {
-    let spacing = rect.size.x / (board.width as f32);
+fn hovered_coord(board: &Board, rect: &Rect, mouse_pos: Pos2) -> Option<Coord> {
+    let spacing = rect.width() / (board.width as f32);
     for c in board.coords() {
-        let x = c.x as f32 * spacing + rect.pos.x;
-        let y = c.y as f32 * spacing + rect.pos.y;
+        let x = c.x as f32 * spacing + rect.left();
+        let y = c.y as f32 * spacing + rect.top();
         let left = x;
         let top = y;
         let right = x + spacing;

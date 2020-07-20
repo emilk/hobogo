@@ -1,6 +1,8 @@
 use std::fmt;
 
-use emigui_wasm::now_sec;
+use serde::{Deserialize, Serialize};
+
+use egui_web::now_sec;
 
 use crate::mcts;
 
