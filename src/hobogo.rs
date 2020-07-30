@@ -460,8 +460,7 @@ impl Board {
 impl Board {
     pub fn ai_move(&self, player: Player, num_players: usize) -> Option<Coord> {
         use rand::SeedableRng;
-        let mut rng = rand::rngs::OsRng::new().unwrap();
-        let mut rng = rand::rngs::SmallRng::from_rng(&mut rng).unwrap(); // Fast
+        let mut rng = rand::rngs::SmallRng::from_entropy(); // Fast
 
         let state = mcts::GameState {
             next_player: player,
