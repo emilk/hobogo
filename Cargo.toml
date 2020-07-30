@@ -20,8 +20,5 @@ egui_web = { git = "https://github.com/emilk/emigui" }
 # egui_web = { path = "../emigui/egui_web" }
 
 # Optimize for small code size:
-[profile.dev]
-opt-level = "s"
-
 [profile.release]
-opt-level = "s"
+opt-level = 2

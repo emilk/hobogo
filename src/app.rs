@@ -2,7 +2,14 @@ use std::collections::VecDeque;
 
 use serde::{Deserialize, Serialize};
 
-use egui::{color::srgba, label, math::*, widgets::*, Align, TextStyle, Ui};
+use egui::{
+    color::{srgba, Color},
+    label,
+    math::*,
+    paint::{LineStyle, PaintCmd, TextStyle},
+    widgets::*,
+    Align, Painter, Ui,
+};
 
 use crate::hobogo::{Board, Coord, Player};
 
@@ -110,8 +117,7 @@ impl App {
             self.state.show_whos_next(ui);
         });
 
-        let cmds = self.show_board_and_interact(ui);
-        ui.add_paint_cmds(cmds);
+        self.show_board_and_interact(ui);
 
         ui.columns(2, |cols| {
             if cols[0].add(Button::new("New Game")).clicked {
@@ -152,7 +158,7 @@ impl App {
         }
     }
 
-    fn show_board_and_interact(&mut self, ui: &mut Ui) -> Vec<PaintCmd> {
+    fn show_board_and_interact(&mut self, ui: &mut Ui) {
         // Add spacing before the board:
         ui.allocate_space(vec2(ui.rect().width(), 8.0));
 
@@ -185,7 +191,7 @@ impl App {
                                 } else {
                                     let mut preview = state.clone();
                                     preview.board[hovered_coord] = Some(state.next_player);
-                                    return preview.show_board(rect, ui);
+                                    return preview.show_board(rect, ui.painter());
                                 }
                             }
                         }
@@ -215,7 +221,7 @@ impl App {
             }
         }
 
-        state.show_board(rect, ui)
+        state.show_board(rect, ui.painter());
     }
 }
 
@@ -298,19 +304,17 @@ impl State {
         name
     }
 
-    fn show_board(&self, rect: Rect, ui: &mut Ui) -> Vec<PaintCmd> {
+    fn show_board(&self, rect: Rect, painter: &Painter) {
         let board = &self.board;
         let spacing = rect.width() / (board.width as f32);
         let volatile = board.volatile_cells(self.num_players());
-
-        let mut cmds = vec![];
 
         let cell_side = spacing * 0.84;
         let corner_radius = (cell_side * 0.25).round();
 
         if self.next_player_is_human() {
             // Highlight who is to play next
-            cmds.push(PaintCmd::Rect {
+            painter.add(PaintCmd::Rect {
                 corner_radius: corner_radius * 2.0f32.sqrt(),
                 fill: None,
                 outline: Some(LineStyle {
@@ -328,14 +332,14 @@ impl State {
             let fill = Some(self.cell_color(c, is_volatile));
 
             if let Some(_player) = board[c] {
-                cmds.push(PaintCmd::Rect {
+                painter.add(PaintCmd::Rect {
                     corner_radius,
                     fill,
                     outline: None,
                     rect: Rect::from_center_size(center, vec2(cell_side, cell_side)),
                 });
             } else {
-                cmds.push(PaintCmd::Circle {
+                painter.add(PaintCmd::Circle {
                     center,
                     fill,
                     outline: None,
@@ -348,27 +352,25 @@ impl State {
 
         // Name chess column names:
         for x in 0..board.width {
-            ui.floating_text(
+            painter.floating_text(
                 rect.min + vec2((x as f32 + 0.5) * spacing, rect.height() + 12.0),
                 &column_name(x),
                 TextStyle::Body,
                 (Align::Center, Align::Min),
-                Some(text_color),
+                text_color,
             );
         }
 
         // Name chess row names:
         for y in 0..board.height {
-            ui.floating_text(
+            painter.floating_text(
                 rect.min + vec2(rect.width() + 12.0, (y as f32 + 0.5) * spacing),
                 &row_name(y),
                 TextStyle::Body,
                 (Align::Min, Align::Center),
-                Some(text_color),
+                text_color,
             );
         }
-
-        cmds
     }
 
     fn cell_color(&self, c: Coord, is_volatile: bool) -> Color {
