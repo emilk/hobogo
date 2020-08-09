@@ -352,22 +352,22 @@ impl State {
 
         // Name chess column names:
         for x in 0..board.width {
-            painter.floating_text(
+            painter.text(
                 rect.min + vec2((x as f32 + 0.5) * spacing, rect.height() + 12.0),
+                (Align::Center, Align::Min),
                 &column_name(x),
                 TextStyle::Body,
-                (Align::Center, Align::Min),
                 text_color,
             );
         }
 
         // Name chess row names:
         for y in 0..board.height {
-            painter.floating_text(
+            painter.text(
                 rect.min + vec2(rect.width() + 12.0, (y as f32 + 0.5) * spacing),
+                (Align::Min, Align::Center),
                 &row_name(y),
                 TextStyle::Body,
-                (Align::Min, Align::Center),
                 text_color,
             );
         }
