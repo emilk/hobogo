@@ -3,10 +3,10 @@ use std::collections::VecDeque;
 use serde::{Deserialize, Serialize};
 
 use egui::{
-    color::{srgba, Color},
+    color::{srgba, Srgba},
     label,
     math::*,
-    paint::{LineStyle, PaintCmd, TextStyle},
+    paint::TextStyle,
     widgets::*,
     Align, Painter, Ui,
 };
@@ -106,14 +106,12 @@ impl App {
     }
 
     pub fn show_gui(&mut self, ui: &mut Ui) {
-        ui.vertical(|ui| {
-            ui.set_layout(egui::Layout::vertical(Align::Center));
+        ui.with_layout(egui::Layout::vertical(Align::Center), |ui| {
             ui.add(label!("HOBOGO").text_style(TextStyle::Heading));
         });
         self.show_settings(ui);
 
-        ui.vertical(|ui| {
-            ui.set_layout(egui::Layout::vertical(Align::Center));
+        ui.with_layout(egui::Layout::vertical(Align::Center), |ui| {
             self.state.show_whos_next(ui);
         });
 
@@ -141,8 +139,8 @@ impl App {
             cols[0].add(Slider::usize(&mut settings.num_bots, 0..=4).text("Bots"));
             cols[1].add(Slider::usize(&mut settings.board_size, 5..=17).text("Size"));
             cols[1]
-                .add(Checkbox::new(&mut settings.humans_first, "Humans go first"))
-                .tooltip_text("Going first is a big advantage");
+                .checkbox(&mut settings.humans_first, "Humans go first")
+                .on_hover_text("Going first is a big advantage");
         });
 
         while settings.num_players() < 2 {
@@ -160,15 +158,15 @@ impl App {
 
     fn show_board_and_interact(&mut self, ui: &mut Ui) {
         // Add spacing before the board:
-        ui.allocate_space(vec2(ui.rect().width(), 8.0));
+        ui.allocate_space(vec2(ui.max_rect().width(), 8.0));
 
         let board_id = ui.make_child_id(&"board");
-        let size = ui.rect().width() - 32.0; // Leave space for row numbers
+        let size = ui.max_rect().width() - 32.0; // Leave space for row numbers
         let rect = ui.allocate_space(vec2(size, size));
         let board_interact = ui.interact(rect, board_id, egui::Sense::click());
 
         // HACK: Add some spacing for the column names
-        ui.allocate_space(vec2(ui.rect().width(), 32.0));
+        ui.allocate_space(vec2(ui.max_rect().width(), 32.0));
 
         let state = &mut self.state;
 
@@ -314,37 +312,24 @@ impl State {
 
         if self.next_player_is_human() {
             // Highlight who is to play next
-            painter.add(PaintCmd::Rect {
-                corner_radius: corner_radius * 2.0f32.sqrt(),
-                fill: None,
-                outline: Some(LineStyle {
-                    width: 2.0,
-                    color: player_color(self.next_player),
-                }),
-                rect: rect.expand(4.0),
-            });
+            painter.rect_stroke(
+                rect.expand(4.0),
+                corner_radius * 2.0f32.sqrt(),
+                (2.0, player_color(self.next_player)),
+            );
         }
 
         for c in board.coords() {
             let center = rect.min + spacing * vec2(c.x as f32 + 0.5, c.y as f32 + 0.5);
 
             let is_volatile = volatile[board.index(c).unwrap()];
-            let fill = Some(self.cell_color(c, is_volatile));
+            let fill = self.cell_color(c, is_volatile);
 
             if let Some(_player) = board[c] {
-                painter.add(PaintCmd::Rect {
-                    corner_radius,
-                    fill,
-                    outline: None,
-                    rect: Rect::from_center_size(center, vec2(cell_side, cell_side)),
-                });
+                let rect = Rect::from_center_size(center, vec2(cell_side, cell_side));
+                painter.rect_filled(rect, corner_radius, fill);
             } else {
-                painter.add(PaintCmd::Circle {
-                    center,
-                    fill,
-                    outline: None,
-                    radius: 0.2 * spacing,
-                });
+                painter.circle_filled(center, 0.2 * spacing, fill);
             }
         }
 
@@ -373,14 +358,14 @@ impl State {
         }
     }
 
-    fn cell_color(&self, c: Coord, is_volatile: bool) -> Color {
+    fn cell_color(&self, c: Coord, is_volatile: bool) -> Srgba {
         let influence = self.board.influence(c);
         if let Some(claimer) = influence.player() {
             let color = player_color(claimer);
             if is_volatile || influence.is_occupied() {
                 color
             } else {
-                srgba(color.r / 2, color.g / 2, color.b / 2, color.a) // Darker
+                srgba(color.r() / 2, color.g() / 2, color.b() / 2, color.a()) // Darker
             }
         } else if self.next_player_is_human()
             && !self
@@ -396,7 +381,7 @@ impl State {
     }
 }
 
-fn player_color(player: Player) -> Color {
+fn player_color(player: Player) -> Srgba {
     match player {
         // 0 => srgba(85, 119, 255, 255),
         // 1 => srgba(205, 0, 0, 255),
