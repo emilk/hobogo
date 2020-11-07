@@ -8,9 +8,9 @@ checksum = "d9fe5e32de01730eb1f6b7f5b51c17e03e2325bf40a74f754f04f130043affff"
 
 [[package]]
 name = "ahash"
-version = "0.4.5"
+version = "0.4.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0adac150c2dd5a9c864d054e07bda5e6bc010cd10036ea5f17e82a2f5867f735"
+checksum = "f6789e291be47ace86a60303502173d84af8327e3627ecf334356ee0f87a164c"
 
 [[package]]
 name = "bitflags"
@@ -41,9 +41,9 @@ dependencies = [
 
 [[package]]
 name = "egui"
-version = "0.2.0"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cfb8e71068116cb6cc7d875086d40be4fedde16153e892c3553c243576d0f870"
+checksum = "25fbba5bf27e7b755b2bceb82edafd9790f9af3a8f673f2638f37e937f8f1716"
 dependencies = [
  "ahash",
  "parking_lot",
@@ -53,9 +53,9 @@ dependencies = [
 
 [[package]]
 name = "egui_web"
-version = "0.2.0"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6db3d8ad4508bc0fe6ef8617df08affd5cefb164cf0206f5843054d0d32a95a9"
+checksum = "7ab354cefec687ebc4e608cea7b75b6db96aebcca68ba063d0a0d44333bc86cb"
 dependencies = [
  "egui",
  "js-sys",

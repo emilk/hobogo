@@ -133,6 +133,12 @@ impl App {
     }
 
     fn show_settings(&mut self, ui: &mut Ui) {
+        ui.style_mut().spacing.slider_width = ui
+            .style()
+            .spacing
+            .slider_width
+            .min(ui.max_rect().width() / 6.0);
+
         let mut settings = self.state.settings;
         ui.columns(2, |cols| {
             cols[0].add(Slider::usize(&mut settings.num_humans, 0..=4).text("Humans"));
@@ -158,15 +164,15 @@ impl App {
 
     fn show_board_and_interact(&mut self, ui: &mut Ui) {
         // Add spacing before the board:
-        ui.allocate_space(vec2(ui.max_rect().width(), 8.0));
+        ui.advance_cursor(8.0);
 
-        let board_id = ui.make_child_id(&"board");
         let size = ui.max_rect().width() - 32.0; // Leave space for row numbers
         let rect = ui.allocate_space(vec2(size, size));
+        let board_id = ui.make_position_id();
         let board_interact = ui.interact(rect, board_id, egui::Sense::click());
 
         // HACK: Add some spacing for the column names
-        ui.allocate_space(vec2(ui.max_rect().width(), 32.0));
+        ui.advance_cursor(32.0);
 
         let state = &mut self.state;
 
